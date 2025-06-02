@@ -79,23 +79,23 @@
 
 <style>
         .report {
-                height:500px;
+                height:350px;
         }
 
         .reportChart {
                 width: 60%;
-                height: 500px;
+                height: 350px;
         }
 
         .reportChart canvas {
                 width: auto;
-                height: 500px;
+                height: 350px;
         }
 
         .reportTable {
                 float: right;
                 width: 30%;
-                height: 500px;
+                height: 350px;
         }
 
         .reportTable table {
