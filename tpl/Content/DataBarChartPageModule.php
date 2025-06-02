@@ -72,7 +72,7 @@
         }
 
         .reportChart {
-                width: 78%;
+                width: 100%;
                 height: 350px;
         }
 
@@ -81,7 +81,8 @@
                 height: 350px;
         }
 
-        .reportTable {
+	.reportTable {
+		display:none;
                 float: right;
                 width: 20%;
 		height: 350px;
