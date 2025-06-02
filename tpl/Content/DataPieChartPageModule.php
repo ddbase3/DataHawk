@@ -83,7 +83,7 @@
         }
 
         .reportChart {
-                width: 60%;
+                width: 78%;
                 height: 350px;
         }
 
@@ -94,9 +94,10 @@
 
         .reportTable {
                 float: right;
-                width: 30%;
+                width: 20%;
                 height: 350px;
-        }
+		overflow-x: hidden;
+	}
 
         .reportTable table {
                 border-collapse: collapse;
