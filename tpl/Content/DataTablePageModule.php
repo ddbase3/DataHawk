@@ -114,3 +114,9 @@ $(function() {
 
 </script>
 
+<style>
+	#reportDatatable { overflow:auto; }
+	#reportDatatable * { font-size:10px; }
+	#reportDatatable td, #reportDatatable th { padding:3px; }
+</style>
+
