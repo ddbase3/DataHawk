@@ -1,0 +1,82 @@
+/*!
+ * jQuery DataTable Stylesheet
+ * https://github.com/ddbase3/JqueryDataTable
+ *
+ * Minimal, modern styles for interactive data tables. Sans-serif, accessible and responsive.
+ *
+ * Author: Daniel Dahme / BASE3 (https://base3.de)
+ * License: LGPL (Lesser General Public License)
+ */
+
+.jquerydatatable-table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+.jquerydatatable-table th, .jquerydatatable-table td {
+	border: 1px solid #ccc;
+	padding: 10px;
+}
+
+.jquerydatatable-table th {
+	background: #e7e7e7;
+	cursor: pointer;
+}
+
+.jquerydatatable-header,
+.jquerydatatable-footer {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	margin: 10px 0;
+}
+
+.jquerydatatable-header > div,
+.jquerydatatable-footer > div {
+	flex: 1 1 33.333%;
+	box-sizing: border-box;
+}
+
+.jquerydatatable-header .left,
+.jquerydatatable-footer .left {
+	text-align: left;
+}
+
+.jquerydatatable-header .center,
+.jquerydatatable-footer .center {
+	text-align: center;
+}
+
+.jquerydatatable-header .right,
+.jquerydatatable-footer .right {
+	text-align: right;
+}
+
+.jquerydatatable-header > div,
+.jquerydatatable-footer > div {
+	min-height: 1.5em;
+}
+
+.jquerydatatable-wrapper button {
+	margin: 2px;
+	padding: 5px 10px;
+	background: #f5f5f5;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.jquerydatatable-column-selector-wrapper .column-toggle-btn:hover {
+	background: #eaeaea;
+}
+
+.jquerydatatable-column-selector-wrapper .column-toggle-menu label {
+	white-space: nowrap;
+}
+
+.jquerydatatable-column-selector-wrapper hr {
+	border: none;
+	border-top: 1px solid #ddd;
+	margin: 5px 0;
+}
+
