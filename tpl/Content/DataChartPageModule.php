@@ -1,14 +1,13 @@
-		<section>
-			<div class="frame">
-				<fieldset class="reportFieldset">
-				<legend>Marks Status</legend>
-				<div id="marksStatsTable" class="reportTable"></div>
-				<div class="reportChart">
-					<canvas id="marksStatsChart"></canvas>
-				</div>
-				</fieldset>
-			</div>
-		</section>
+                <section>
+                        <div class="frame">
+                                <div class="report">
+                                        <div id="marksStatsTable" class="reportTable"></div>
+                                        <div class="reportChart">
+                                                <canvas id="marksStatsChart"></canvas>
+                                        </div>
+                                </div>
+                        </div>
+                </section>
 
 <script>
         urlMarksStats = '?name=coursemarksstatsconnector&out=json';
@@ -24,9 +23,9 @@
                 }
         }
 
-	$(function () {
+        $(function () {
 
-	    $.loadScript('components/Base3/DataHawk/chart/chart.js', function () {
+            $.loadScript('components/Base3/DataHawk/chart/chart.js', function () {
 
                 console.log('chart.js loaded');
 
@@ -73,31 +72,30 @@
                         });
                 });
 
-	    });
+            });
 
-	});
+        });
 </script>
 
 <style>
-        .reportFieldset {
-                width: 100%;
-                box-sizing: border-box;
-                margin-bottom: 2em;
-                display: block;
-        }
-
-        .reportTable {
-                overflow: auto;
-                display: block;
-                width: 100%;
-                box-sizing: border-box;
+        .report {
+                height:500px;
         }
 
         .reportChart {
-                height: 400px;
-                display: block;
-                width: 100%;
-                box-sizing: border-box;
+                width: 60%;
+                height: 500px;
+        }
+
+        .reportChart canvas {
+                width: auto;
+                height: 500px;
+        }
+
+        .reportTable {
+                float: right;
+                width: 30%;
+                height: 500px;
         }
 
         .reportTable table {
@@ -116,42 +114,6 @@
         }
 
         @media only screen and (min-width: 600px) {
-                .reportTable {
-                        height: 400px;
-                }
-
-                .reportFieldset {
-                        float: left;
-                        width: 32%;
-                        margin-right: 1%;
-                        height: 450px;
-                }
-
-                .reportFieldset:nth-of-type(2n) {
-                        width: 65%;
-                        margin-right: 0;
-                }
-
-                .reportTable {
-                        float: right;
-                        width: 25%;
-                        height: 100%;
-                        overflow-y: auto;
-                }
-
-                .reportChart {
-                        float: left;
-                        width: 70%;
-                        height: 100%;
-                }
-
-                #loginStatsTable.reportTable {
-                        width: 15%;
-                }
-
-                .reportChart.login {
-                        width: 82%;
-                }
         }
 </style>
 
