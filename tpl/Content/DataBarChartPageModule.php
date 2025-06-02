@@ -1,7 +1,7 @@
                 <section>
                         <div class="frame">
                                 <div class="report">
-                                        <div id="loginStatsTable" class="reportTable"></div>
+                                        <div id="loginStatsTable" class="reportTable hidden"></div>
                                         <div class="reportChart">
                                                 <canvas id="loginStatsChart"></canvas>
                                         </div>
@@ -67,6 +67,10 @@
 </script>
 
 <style>
+	.hidden {
+		display:none;
+	}
+
         .report {
                 height:350px;
         }
@@ -82,7 +86,6 @@
         }
 
 	.reportTable {
-		display:none;
                 float: right;
                 width: 20%;
 		height: 350px;
