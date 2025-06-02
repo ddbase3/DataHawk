@@ -2,7 +2,7 @@
                         <div class="frame">
                                 <div class="report">
                                         <div id="marksStatsTable" class="reportTable"></div>
-                                        <div class="reportChart">
+                                        <div class="reportChart" style="width:60%;">
                                                 <canvas id="marksStatsChart"></canvas>
                                         </div>
                                 </div>
@@ -78,12 +78,15 @@
 </script>
 
 <style>
-        .report {
+        .hidden {
+                display:none;
+        }
+
+	.report {
                 height:350px;
         }
 
         .reportChart {
-                width: 60%;
                 height: 350px;
         }
 

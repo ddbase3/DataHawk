@@ -2,7 +2,7 @@
                         <div class="frame">
                                 <div class="report">
                                         <div id="loginStatsTable" class="reportTable hidden"></div>
-                                        <div class="reportChart">
+                                        <div class="reportChart" style="width:100%;">
                                                 <canvas id="loginStatsChart"></canvas>
                                         </div>
 				</div>
@@ -76,7 +76,6 @@
         }
 
         .reportChart {
-                width: 100%;
                 height: 350px;
         }
 
@@ -87,7 +86,7 @@
 
 	.reportTable {
                 float: right;
-                width: 20%;
+                width: 30%;
 		height: 350px;
 		overflow-x: hidden;
         }
