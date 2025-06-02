@@ -1,5 +1,157 @@
 		<section>
 			<div class="frame">
-				Hello Chart!
+				<fieldset class="reportFieldset">
+				<legend>Marks Status</legend>
+				<div id="marksStatsTable" class="reportTable"></div>
+				<div class="reportChart">
+					<canvas id="marksStatsChart"></canvas>
+				</div>
+				</fieldset>
 			</div>
 		</section>
+
+<script>
+        urlMarksStats = '?name=coursemarksstatsconnector&out=json';
+
+        function fillTable(container, result) {
+                if (!result.length) return;
+                var table = $('<table>').appendTo(container);
+                var trHead = $('<tr>').appendTo(table);
+                for (var key in result[0]) $('<th>' + key + '</th>').appendTo(trHead);
+                for (let i in result) {
+                        var trBody = $('<tr>').appendTo(table);
+                        for (var key in result[i]) $('<td>' + result[i][key] + '</td>').appendTo(trBody);
+                }
+        }
+
+	$(function () {
+
+	    $.loadScript('components/Base3/DataHawk/chart/chart.js', function () {
+
+                console.log('chart.js loaded');
+
+                $.getJSON(urlMarksStats, function(result) {
+                        console.log(result);
+                        fillTable($('#marksStatsTable'), result);
+
+                        if (!result.length) return;
+                        const labels = [];
+                        const data = [];
+                        const bgs = [];
+
+                        for (let i in result) {
+                                labels.push(result[i]['markstat']);
+                                data.push(result[i]['num']);
+                                switch (result[i]['markstat']) {
+                                        case 'No info':
+                                                bgs.push('rgb(127, 127, 127)');
+                                                break;
+                                        case 'Fail':
+                                                bgs.push('rgb(219, 0, 0)');
+                                                break;
+                                        case 'Intermediate':
+                                                bgs.push('rgb(219, 219, 0)');
+                                                break;
+                                        case 'Pass':
+                                                bgs.push('rgb(0, 219, 0)');
+                                                break;
+                                }
+                        }
+
+                        const ctx = document.getElementById('marksStatsChart');
+                        new Chart(ctx, {
+                                type: 'doughnut',
+                                data: {
+                                        labels: labels,
+                                        datasets: [{
+                                                label: 'Marks Status',
+                                                data: data,
+                                                backgroundColor: bgs,
+                                                hoverOffset: 4
+                                        }]
+                                }
+                        });
+                });
+
+	    });
+
+	});
+</script>
+
+<style>
+        .reportFieldset {
+                width: 100%;
+                box-sizing: border-box;
+                margin-bottom: 2em;
+                display: block;
+        }
+
+        .reportTable {
+                overflow: auto;
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+        }
+
+        .reportChart {
+                height: 400px;
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+        }
+
+        .reportTable table {
+                border-collapse: collapse;
+                width: 100%;
+        }
+
+        .reportTable table th {
+                background: #eee;
+        }
+
+        .reportTable table th,
+        .reportTable table td {
+                border: 1px solid #000;
+                padding: 4px;
+        }
+
+        @media only screen and (min-width: 600px) {
+                .reportTable {
+                        height: 400px;
+                }
+
+                .reportFieldset {
+                        float: left;
+                        width: 32%;
+                        margin-right: 1%;
+                        height: 450px;
+                }
+
+                .reportFieldset:nth-of-type(2n) {
+                        width: 65%;
+                        margin-right: 0;
+                }
+
+                .reportTable {
+                        float: right;
+                        width: 25%;
+                        height: 100%;
+                        overflow-y: auto;
+                }
+
+                .reportChart {
+                        float: left;
+                        width: 70%;
+                        height: 100%;
+                }
+
+                #loginStatsTable.reportTable {
+                        width: 15%;
+                }
+
+                .reportChart.login {
+                        width: 82%;
+                }
+        }
+</style>
+
