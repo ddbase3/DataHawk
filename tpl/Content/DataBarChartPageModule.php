@@ -23,7 +23,7 @@
                 }
         }
 
-        $(function () {
+        document.addEventListener('DOMContentLoaded', () => {
 
             $.loadScript('components/Base3/DataHawk/chart/chart.js', function () {
 

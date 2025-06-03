@@ -6,7 +6,7 @@
 
 <script>
 
-$(function() {
+document.addEventListener('DOMContentLoaded', () => {
     urlDataTable = 'base3.php?name=coursereportconnector&out=json';
 
     (async () => {
