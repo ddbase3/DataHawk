@@ -10,7 +10,7 @@
                 </section>
 
 <script>
-	urlLoginStats = '?name=courseloginstatsconnector&out=json';
+	urlLoginStats = 'base3.php?name=courseloginstatsconnector&out=json';
 
         function fillTable(container, result) {
                 if (!result.length) return;

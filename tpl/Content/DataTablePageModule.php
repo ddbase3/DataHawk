@@ -7,6 +7,7 @@
 <script>
 
 $(function() {
+    urlDataTable = 'base3.php?name=coursereportconnector&out=json';
 
     (async () => {
 	await AssetLoader.loadCssAsync('components/Base3/DataHawk/jquerydatatable/jquerydatatable.css');
@@ -85,7 +86,7 @@ $(function() {
         }
 
         $('#reportDatatable').jqueryDataTable({
-                dataSource: '?name=coursereportconnector&out=json',
+                dataSource: urlDataTable,
                 columns: columns,
                 sortColumn: '_usr_data_login',
                 sortDirection: 'asc',
