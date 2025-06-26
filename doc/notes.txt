@@ -1,0 +1,271 @@
+Abfrage-Schema:
+
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schema/expression.schema.json",
+  "title": "Expression",
+  "description": "Recursive element expression used in SELECT, WHERE, HAVING etc.",
+  "type": ["object", "number", "string", "boolean", "null"],
+  "oneOf": [
+    { "type": "number" },
+    { "type": "string" },
+    { "type": "boolean" },
+    { "type": "null" },
+    {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["fld", "fn", "op"]
+        },
+        "alias": {
+          "type": "string",
+          "description": "Optional alias, useful in SELECT context"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "fld" } }
+          },
+          "then": {
+            "required": ["table", "field"],
+            "properties": {
+              "table": { "type": "string" },
+              "field": { "type": "string" },
+              "tablealias": { "type": "string" },
+              "variant": { "enum": ["required", "optional"] }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "fn" } }
+          },
+          "then": {
+            "required": ["function", "params"],
+            "properties": {
+              "function": { "type": "string" },
+              "params": {
+                "type": "array",
+                "items": { "$ref": "#" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "op" } }
+          },
+          "then": {
+            "required": ["operator", "params"],
+            "properties": {
+              "operator": { "type": "string" },
+              "params": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#" }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  ]
+}
+
+Gesamt-Schema:
+
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schema/query.schema.json",
+  "title": "Structured Query",
+  "type": "object",
+  "properties": {
+    "select": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "element": { "$ref": "#/$defs/element" },
+          "alias": { "type": "string" }
+        },
+        "required": ["element"],
+        "additionalProperties": false
+      }
+    },
+    "from": {
+      "type": "string",
+      "description": "Main table to query from"
+    },
+    "joins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["table"],
+        "properties": {
+          "table": { "type": "string" },
+          "tablealias": { "type": "string" },
+          "on": {
+            "type": "object",
+            "patternProperties": {
+              "^.*$": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "type": {
+            "enum": ["INNER", "LEFT", "RIGHT", "FULL"],
+            "default": "LEFT"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "where": { "$ref": "#/$defs/element" },
+    "group_by": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/element" }
+    },
+    "having": {
+      "$ref": "#/$defs/element"
+    },
+    "order_by": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "element": { "$ref": "#/$defs/element" },
+          "direction": { "enum": ["ASC", "DESC"], "default": "ASC" }
+        },
+        "required": ["element"],
+        "additionalProperties": false
+      }
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "distinct": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": ["select", "from"],
+  "additionalProperties": false,
+
+  "$defs": {
+    "element": {
+      "type": ["object", "string", "number", "boolean", "null"],
+      "description": "An expression element: field, function, operator or scalar",
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "boolean" },
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "enum": ["fld", "fn", "op"]
+            },
+            "alias": {
+              "type": "string"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "type": { "const": "fld" } }
+              },
+              "then": {
+                "required": ["table", "field"],
+                "properties": {
+                  "table": { "type": "string" },
+                  "field": { "type": "string" },
+                  "tablealias": { "type": "string" },
+                  "variant": { "enum": ["required", "optional"] }
+                },
+                "additionalProperties": false
+              }
+            },
+            {
+              "if": {
+                "properties": { "type": { "const": "fn" } }
+              },
+              "then": {
+                "required": ["function", "params"],
+                "properties": {
+                  "function": { "type": "string" },
+                  "params": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/element" }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            {
+              "if": {
+                "properties": { "type": { "const": "op" } }
+              },
+              "then": {
+                "required": ["operator", "params"],
+                "properties": {
+                  "operator": { "type": "string" },
+                  "params": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "$ref": "#/$defs/element" }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+
+Beispielauszug (gültig laut Schema)
+
+{
+  "select": [
+    {
+      "element": {
+        "type": "fn",
+        "function": "COUNT",
+        "params": [{ "type": "fld", "table": "orders", "field": "id" }]
+      },
+      "alias": "order_count"
+    }
+  ],
+  "from": "users",
+  "where": {
+    "type": "op",
+    "operator": "AND",
+    "params": [
+      {
+        "type": "op",
+        "operator": "=",
+        "params": [
+          { "type": "fld", "table": "users", "field": "active" },
+          true
+        ]
+      }
+    ]
+  },
+  "group_by": [
+    { "type": "fld", "table": "users", "field": "id" }
+  ]
+}
+
