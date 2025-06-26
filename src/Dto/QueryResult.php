@@ -10,7 +10,8 @@ class QueryResult
      */
     public function __construct(
         public array $columns,
-        public array $rows
+	public array $rows,
+	public ?string $debugSql = null
     ) {}
 }
 

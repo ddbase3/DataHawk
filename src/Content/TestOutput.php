@@ -35,24 +35,82 @@ class TestOutput implements IOutput {
         $out .= "<h2>🧪 Query: packagist_package (name, downloads)</h2>";
 
         try {
-            $query = [
-                "select" => [
-                    [ "element" => [ "type" => "fld", "table" => "packagist_package", "field" => "name" ] ],
-                    [ "element" => [ "type" => "fld", "table" => "packagist_package", "field" => "downloads" ], "alias" => "dl" ]
-                ],
-                "from" => "packagist_package",
-                "where" => [
-                    "type" => "op",
-                    "operator" => ">",
-                    "params" => [
-                        [ "type" => "fld", "table" => "packagist_package", "field" => "downloads" ],
-                        5
-                    ]
-                ],
-                "limit" => 10
-            ];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+$query = [
+    "select" => [
+        [
+            "element" => [ "type" => "fld", "table" => "packagist_package", "field" => "handle_id" ],
+            "alias" => "handle"
+        ],
+        [
+            "element" => [
+                "type" => "fn",
+                "function" => "COUNT",
+                "params" => [
+                    [ "type" => "fld", "table" => "packagist_package", "field" => "id" ]
+                ]
+            ],
+            "alias" => "package_count"
+        ],
+        [
+            "element" => [
+                "type" => "fn",
+                "function" => "MAX",
+                "params" => [
+                    [ "type" => "fld", "table" => "packagist_package", "field" => "downloads" ]
+                ]
+            ],
+            "alias" => "max_dl"
+        ]
+    ],
+    "from" => "packagist_package",
+    "where" => [
+        "type" => "op",
+        "operator" => "LIKE",
+        "params" => [
+            [ "type" => "fld", "table" => "packagist_package", "field" => "name" ],
+            "ddbase3/%"
+        ]
+    ],
+    "group_by" => [
+        [ "type" => "fld", "table" => "packagist_package", "field" => "handle_id" ]
+    ],
+    "having" => [
+        "type" => "op",
+        "operator" => ">=",
+        "params" => [
+            [
+                "type" => "fn",
+                "function" => "COUNT",
+                "params" => [
+                    [ "type" => "fld", "table" => "packagist_package", "field" => "id" ]
+                ]
+            ],
+            1
+        ]
+    ],
+    "order_by" => [
+        [
+            "element" => [
+                "type" => "fn",
+                "function" => "MAX",
+                "params" => [
+                    [ "type" => "fld", "table" => "packagist_package", "field" => "downloads" ]
+                ]
+            ],
+            "direction" => "DESC"
+        ]
+    ],
+    "limit" => 10
+];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
             $result = $this->dataqueryservice->executeQuery($query);
+
+	    $out .= "<h3>🧠 Generated SQL</h3><pre>" . htmlspecialchars($result->debugSql ?? '[n/a]') . "</pre>";
 
             // Ausgabe als Tabelle
             $out .= "<table border='1' cellpadding='4' cellspacing='0'><thead><tr>";

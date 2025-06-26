@@ -50,6 +50,40 @@ class QueryCompiler implements IQueryCompiler
             $sql .= ' WHERE ' . $where;
         }
 
+        // GROUP BY clause
+        if (isset($query['group_by']) && is_array($query['group_by'])) {
+            $groupParts = array_map(fn($el) => $this->compileElement($el), $query['group_by']);
+            $sql .= ' GROUP BY ' . implode(', ', $groupParts);
+        }
+
+	// HAVING clause
+        if (isset($query['having'])) {
+            $having = $this->compileElement($query['having']);
+            $sql .= ' HAVING ' . $having;
+        }
+
+        // ORDER BY clause
+        if (isset($query['order_by']) && is_array($query['order_by'])) {
+            $orderParts = [];
+
+            foreach ($query['order_by'] as $order) {
+                if (!isset($order['element'])) {
+                    throw new QueryValidationException("Missing element in order_by clause.");
+                }
+
+                $expr = $this->compileElement($order['element']);
+                $dir = strtoupper($order['direction'] ?? 'ASC');
+
+                if (!in_array($dir, ['ASC', 'DESC'])) {
+                    throw new QueryValidationException("Invalid order direction: $dir");
+                }
+
+                $orderParts[] = $expr . ' ' . $dir;
+            }
+
+            $sql .= ' ORDER BY ' . implode(', ', $orderParts);
+        }
+
         // LIMIT / OFFSET
         if (isset($query['limit'])) {
             $sql .= ' LIMIT ' . (int)$query['limit'];

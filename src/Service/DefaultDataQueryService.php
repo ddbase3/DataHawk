@@ -65,7 +65,7 @@ class DefaultDataQueryService implements IDataQueryService
             }
         }
 
-        return new QueryResult($columns, $rows);
+        return new QueryResult($columns, $rows, $sqlQuery->sql);
     }
 
     /**
