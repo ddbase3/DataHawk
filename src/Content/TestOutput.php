@@ -41,21 +41,26 @@ class TestOutput implements IOutput {
 $query = [
     "select" => [
         [
-            "element" => [ "type" => "fld", "table" => "packagist_package", "field" => "name" ],
-            "alias" => "package"
+            "element" => [
+                "type" => "fld",
+                "table" => "packagist_handle",
+                "field" => "name",
+                "tablealias" => "vendor1"
+            ],
+            "alias" => "first_vendor"
         ],
         [
             "element" => [
                 "type" => "fld",
                 "table" => "packagist_handle",
                 "field" => "name",
-                "variant" => "equired" // ← 🔥 Trigger für Join!
+                "tablealias" => "vendor2"
             ],
-            "alias" => "vendor"
+            "alias" => "second_vendor"
         ]
     ],
     "from" => "packagist_package",
-    "limit" => 10
+    "limit" => 5
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////

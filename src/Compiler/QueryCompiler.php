@@ -11,6 +11,8 @@ use DataHawk\Util\Graph;
 class QueryCompiler implements IQueryCompiler
 {
     private Graph $joinGraph;
+    private array $tableAliases = []; // alias => table
+    private array $aliasUsage = [];   // table => alias[]
 
     public function __construct(
         private ISchemaProvider $schemaprovider
@@ -42,11 +44,9 @@ class QueryCompiler implements IQueryCompiler
             throw new QueryValidationException("Query must contain 'select' and 'from'.");
         }
 
+        $this->collectAliasUsage($query);
+
         $from = $query['from'];
-        $tableMeta = $this->schemaprovider->getTable($from);
-        if (!$tableMeta) {
-            throw new QueryValidationException("Unknown table: $from");
-        }
 
         $joinRequests = [];
         $elementSources = array_merge(
@@ -113,6 +113,38 @@ class QueryCompiler implements IQueryCompiler
         return new SqlQuery($sql);
     }
 
+    private function collectAliasUsage(array $query): void
+    {
+        $nodes = array_merge(
+            $query['select'] ?? [],
+            $query['group_by'] ?? [],
+            $query['order_by'] ?? [],
+            isset($query['where']) ? [$query['where']] : [],
+            isset($query['having']) ? [$query['having']] : []
+        );
+
+        foreach ($nodes as $node) {
+            $this->scanForAliases($node);
+        }
+    }
+
+    private function scanForAliases(mixed $node): void
+    {
+        if (!is_array($node)) return;
+
+        if (isset($node['type']) && $node['type'] === 'fld') {
+            $table = $node['table'];
+            $alias = $node['tablealias'] ?? $table;
+            $this->aliasUsage[$table][$alias] = true;
+        }
+
+        foreach ($node as $child) {
+            if (is_array($child)) {
+                $this->scanForAliases($child);
+            }
+        }
+    }
+
     private function collectJoinDependencies(array $nodes, array &$tables): void
     {
         foreach ($nodes as $node) {
@@ -153,20 +185,31 @@ class QueryCompiler implements IQueryCompiler
             if (!$path) $path = $paths[0];
 
             foreach ($path as $step) {
-                if (in_array($step['to'], $visited, true)) continue;
-                $visited[] = $step['to'];
+                $table = $step['to'];
 
-                $isDefault = $step['meta']['default'] ?? false;
-                $stepType = strtoupper($step['meta']['type'] ?? 'INNER');
+                $aliases = array_keys($this->aliasUsage[$table] ?? [$table => true]);
+                foreach ($aliases as $alias) {
+                    if (isset($this->tableAliases[$alias])) continue;
 
-                $useLeft = ($variant && strtoupper($variant) === 'OPTIONAL') || (!$variant && $isDefault && $stepType === 'LEFT');
-                $joinType = $useLeft ? 'LEFT JOIN' : 'INNER JOIN';
+                    $this->tableAliases[$alias] = $table;
 
-                $onParts = [];
-                foreach ($step['meta']['on'] as $left => $right) {
-                    $onParts[] = $this->quoteTableField($left) . ' = ' . $this->quoteTableField($right);
+                    $isDefault = $step['meta']['default'] ?? false;
+                    $stepType = strtoupper($step['meta']['type'] ?? 'INNER');
+
+                    $useLeft = ($variant && strtoupper($variant) === 'OPTIONAL') || (!$variant && $isDefault && $stepType === 'LEFT');
+                    $joinType = $useLeft ? 'LEFT JOIN' : 'INNER JOIN';
+
+                    $onParts = [];
+                    foreach ($step['meta']['on'] as $left => $right) {
+                        $onParts[] = $this->quoteTableField($left) . ' = ' . $this->quoteTableField($right);
+                    }
+
+                    $sql .= " $joinType " . $this->quoteIdentifier($table);
+                    if ($alias !== $table) {
+                        $sql .= " AS " . $this->quoteIdentifier($alias);
+                    }
+                    $sql .= " ON " . implode(" AND ", $onParts);
                 }
-                $sql .= " $joinType " . $this->quoteIdentifier($step['to']) . " ON " . implode(" AND ", $onParts);
             }
         }
 
@@ -193,7 +236,7 @@ class QueryCompiler implements IQueryCompiler
 
     private function compileField(array $fld): string
     {
-        $alias = $fld['tablealias'] ?? $fld['table'];
+        $alias = $fld['tablealias'] ?? array_search($fld['table'], $this->tableAliases, true) ?? $fld['table'];
         $column = $fld['field'];
         return $this->quoteIdentifier($alias) . '.' . $this->quoteIdentifier($column);
     }
@@ -227,7 +270,8 @@ class QueryCompiler implements IQueryCompiler
     {
         if (str_contains($str, '.')) {
             [$table, $field] = explode('.', $str, 2);
-            return $this->quoteIdentifier($table) . '.' . $this->quoteIdentifier($field);
+            $alias = ($res = array_search($table, $this->tableAliases, true)) !== false ? $res : $table;
+	    return $this->quoteIdentifier($alias) . '.' . $this->quoteIdentifier($field);
         }
         return $this->quoteIdentifier($str);
     }
