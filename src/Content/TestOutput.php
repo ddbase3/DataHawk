@@ -41,68 +41,20 @@ class TestOutput implements IOutput {
 $query = [
     "select" => [
         [
-            "element" => [ "type" => "fld", "table" => "packagist_package", "field" => "handle_id" ],
-            "alias" => "handle"
+            "element" => [ "type" => "fld", "table" => "packagist_package", "field" => "name" ],
+            "alias" => "package"
         ],
         [
             "element" => [
-                "type" => "fn",
-                "function" => "COUNT",
-                "params" => [
-                    [ "type" => "fld", "table" => "packagist_package", "field" => "id" ]
-                ]
+                "type" => "fld",
+                "table" => "packagist_handle",
+                "field" => "name",
+                "variant" => "required" // ← 🔥 Trigger für Join!
             ],
-            "alias" => "package_count"
-        ],
-        [
-            "element" => [
-                "type" => "fn",
-                "function" => "MAX",
-                "params" => [
-                    [ "type" => "fld", "table" => "packagist_package", "field" => "downloads" ]
-                ]
-            ],
-            "alias" => "max_dl"
+            "alias" => "vendor"
         ]
     ],
     "from" => "packagist_package",
-    "where" => [
-        "type" => "op",
-        "operator" => "LIKE",
-        "params" => [
-            [ "type" => "fld", "table" => "packagist_package", "field" => "name" ],
-            "ddbase3/%"
-        ]
-    ],
-    "group_by" => [
-        [ "type" => "fld", "table" => "packagist_package", "field" => "handle_id" ]
-    ],
-    "having" => [
-        "type" => "op",
-        "operator" => ">=",
-        "params" => [
-            [
-                "type" => "fn",
-                "function" => "COUNT",
-                "params" => [
-                    [ "type" => "fld", "table" => "packagist_package", "field" => "id" ]
-                ]
-            ],
-            1
-        ]
-    ],
-    "order_by" => [
-        [
-            "element" => [
-                "type" => "fn",
-                "function" => "MAX",
-                "params" => [
-                    [ "type" => "fld", "table" => "packagist_package", "field" => "downloads" ]
-                ]
-            ],
-            "direction" => "DESC"
-        ]
-    ],
     "limit" => 10
 ];
 

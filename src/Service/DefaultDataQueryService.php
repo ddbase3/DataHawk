@@ -53,8 +53,12 @@ class DefaultDataQueryService implements IDataQueryService
         $sqlQuery = $this->querycompiler->compile($queryJson);
 
         // 2. Run query via IDatabase service
-        $this->database->connect();
-	$rows = $this->database->multiQuery($sqlQuery->sql);
+        try {
+            $this->database->connect();
+            $rows = $this->database->multiQuery($sqlQuery->sql);
+        } catch (\Throwable $e) {
+            return new QueryResult([], [], $sqlQuery->sql . "\n\n❌ DB Error: " . $e->getMessage());
+        }
 
         // 3. Derive columns from result set
         $columns = [];
