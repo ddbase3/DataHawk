@@ -83,6 +83,12 @@ class SchemaProvider implements ISchemaProvider
                     targetTable: 'packagist_handle',
                     on: ['packagist_package.handle_id' => 'packagist_handle.id'],
                     type: 'INNER'
+                ),
+                new JoinMetadata(
+                    targetTable: 'packagist_handle',
+                    on: ['packagist_package.handle_id' => 'packagist_handle.id'],
+                    type: 'LEFT',
+                    meta: ['default' => true]
                 )
             ],
             defaultFilters: []

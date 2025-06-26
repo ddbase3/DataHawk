@@ -49,7 +49,7 @@ $query = [
                 "type" => "fld",
                 "table" => "packagist_handle",
                 "field" => "name",
-                "variant" => "required" // ← 🔥 Trigger für Join!
+                "variant" => "equired" // ← 🔥 Trigger für Join!
             ],
             "alias" => "vendor"
         ]

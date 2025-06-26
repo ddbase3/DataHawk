@@ -7,7 +7,8 @@ class JoinMetadata
     public function __construct(
         public string $targetTable,
         public array $on,
-        public string $type = 'INNER'
+        public string $type = 'INNER',
+        public array $meta = [] // e.g. ['default' => true]
     ) {}
 }
 

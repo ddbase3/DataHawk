@@ -20,11 +20,17 @@ class QueryCompiler implements IQueryCompiler
         foreach ($this->schemaprovider->getSchema() as $table) {
             $this->joinGraph->addNode($table->name);
             foreach ($table->joins as $join) {
+                $meta = $join->meta;
+                $meta['on'] = $join->on;
+                $meta['type'] = $join->type;
+
+                $label = !empty($meta['default']) ? 'default' : uniqid('join_', true);
+
                 $this->joinGraph->addEdge(
                     $table->name,
                     $join->targetTable,
-                    'default',
-                    ['on' => $join->on, 'type' => $join->type]
+                    $label,
+                    $meta
                 );
             }
         }
@@ -42,7 +48,6 @@ class QueryCompiler implements IQueryCompiler
             throw new QueryValidationException("Unknown table: $from");
         }
 
-        // Collect JOIN dependencies
         $joinRequests = [];
         $elementSources = array_merge(
             $query['select'] ?? [],
@@ -53,7 +58,6 @@ class QueryCompiler implements IQueryCompiler
         );
         $this->collectJoinDependencies($elementSources, $joinRequests);
 
-        // SELECT clause
         $selectParts = [];
         foreach ($query['select'] as $entry) {
             if (!isset($entry['element'])) {
@@ -68,27 +72,21 @@ class QueryCompiler implements IQueryCompiler
 
         $sql = 'SELECT ' . implode(', ', $selectParts);
         $sql .= ' FROM ' . $this->quoteIdentifier($from);
-
-        // JOINs
         $sql .= $this->compileJoins($from, $joinRequests);
 
-        // WHERE
         if (isset($query['where'])) {
             $sql .= ' WHERE ' . $this->compileElement($query['where']);
         }
 
-        // GROUP BY
         if (isset($query['group_by']) && is_array($query['group_by'])) {
             $groupParts = array_map(fn($el) => $this->compileElement($el), $query['group_by']);
             $sql .= ' GROUP BY ' . implode(', ', $groupParts);
         }
 
-        // HAVING
         if (isset($query['having'])) {
             $sql .= ' HAVING ' . $this->compileElement($query['having']);
         }
 
-        // ORDER BY
         if (isset($query['order_by']) && is_array($query['order_by'])) {
             $orderParts = [];
             foreach ($query['order_by'] as $order) {
@@ -105,7 +103,6 @@ class QueryCompiler implements IQueryCompiler
             $sql .= ' ORDER BY ' . implode(', ', $orderParts);
         }
 
-        // LIMIT / OFFSET
         if (isset($query['limit'])) {
             $sql .= ' LIMIT ' . (int)$query['limit'];
         }
@@ -120,8 +117,8 @@ class QueryCompiler implements IQueryCompiler
     {
         foreach ($nodes as $node) {
             if (is_array($node)) {
-                if (isset($node['type']) && $node['type'] === 'fld' && !empty($node['variant'])) {
-                    $tables[$node['table']] = $node['variant'];
+                if (isset($node['type']) && $node['type'] === 'fld') {
+                    $tables[$node['table']] = $node['variant'] ?? null;
                 }
                 if (isset($node['element'])) {
                     $this->collectJoinDependencies([$node['element']], $tables);
@@ -146,12 +143,25 @@ class QueryCompiler implements IQueryCompiler
                 throw new QueryValidationException("No join path from '$from' to '$target'");
             }
 
-            $path = $paths[0];
+            $path = null;
+            foreach ($paths as $candidate) {
+                if (!empty($candidate[0]['meta']['default'])) {
+                    $path = $candidate;
+                    break;
+                }
+            }
+            if (!$path) $path = $paths[0];
+
             foreach ($path as $step) {
                 if (in_array($step['to'], $visited, true)) continue;
                 $visited[] = $step['to'];
 
-                $joinType = strtoupper($variant) === 'OPTIONAL' ? 'LEFT JOIN' : 'INNER JOIN';
+                $isDefault = $step['meta']['default'] ?? false;
+                $stepType = strtoupper($step['meta']['type'] ?? 'INNER');
+
+                $useLeft = ($variant && strtoupper($variant) === 'OPTIONAL') || (!$variant && $isDefault && $stepType === 'LEFT');
+                $joinType = $useLeft ? 'LEFT JOIN' : 'INNER JOIN';
+
                 $onParts = [];
                 foreach ($step['meta']['on'] as $left => $right) {
                     $onParts[] = $this->quoteTableField($left) . ' = ' . $this->quoteTableField($right);
