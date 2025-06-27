@@ -2,20 +2,20 @@
 
 namespace DataHawk\Compiler;
 
-use DataHawk\Api\ISchemaProvider;
-use DataHawk\Api\IQueryCompiler;
+use DataHawk\Api\IReportSchemaProvider;
+use DataHawk\Api\IReportQueryCompiler;
 use DataHawk\Exception\QueryValidationException;
 use DataHawk\Dto\SqlQuery;
 use DataHawk\Util\Graph;
 
-class QueryCompiler implements IQueryCompiler
+class ReportQueryCompiler implements IReportQueryCompiler
 {
     private Graph $joinGraph;
     private array $tableAliases = []; // alias => table
     private array $aliasUsage = [];   // table => alias[]
 
     public function __construct(
-        private ISchemaProvider $schemaprovider
+        private IReportSchemaProvider $schemaprovider
     ) {
         $this->joinGraph = new Graph();
 

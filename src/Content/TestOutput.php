@@ -3,12 +3,12 @@
 namespace DataHawk\Content;
 
 use Base3\Api\IOutput;
-use DataHawk\Api\IDataQueryService;
+use DataHawk\Api\IReportQueryService;
 
 class TestOutput implements IOutput {
 
     public function __construct(
-        private readonly IDataQueryService $dataqueryservice
+        private readonly IReportQueryService $dataqueryservice
     ) {}
 
     public static function getName(): string {

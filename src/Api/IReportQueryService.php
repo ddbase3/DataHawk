@@ -5,7 +5,7 @@ namespace DataHawk\Api;
 use DataHawk\Dto\TableMetadata;
 use DataHawk\Dto\QueryResult;
 
-interface IDataQueryService
+interface IReportQueryService
 {
     /**
      * Returns the list of all visible tables for the current user.

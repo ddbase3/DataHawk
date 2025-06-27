@@ -4,7 +4,7 @@ namespace DataHawk\Api;
 
 use DataHawk\Dto\SqlQuery;
 
-interface IQueryCompiler {
+interface IReportQueryCompiler {
     public function compile(array $query): SqlQuery;
 }
 

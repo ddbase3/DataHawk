@@ -4,7 +4,7 @@ namespace DataHawk\Api;
 
 use DataHawk\Dto\TableMetadata;
 
-interface ISchemaProvider
+interface IReportSchemaProvider
 {
     /**
      * Returns the full schema definition.

@@ -2,12 +2,12 @@
 
 namespace DataHawk\Schema;
 
-use DataHawk\Api\ISchemaProvider;
+use DataHawk\Api\IReportSchemaProvider;
 use DataHawk\Dto\TableMetadata;
 use DataHawk\Dto\FieldMetadata;
 use DataHawk\Dto\JoinMetadata;
 
-class SchemaProvider implements ISchemaProvider
+class DefaultReportSchemaProvider implements IReportSchemaProvider
 {
     /**
      * Returns all defined tables.

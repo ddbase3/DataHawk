@@ -66,4 +66,72 @@ $query = [
     "limit" => 10
 ];
 
+$query = [
+    "select" => [
+        [
+            "element" => [
+                "type" => "fld",
+                "table" => "packagist_handle",
+                "field" => "name",
+                "tablealias" => "vendor1"
+            ],
+            "alias" => "first_vendor"
+        ],
+        [
+            "element" => [
+                "type" => "fld",
+                "table" => "packagist_handle",
+                "field" => "name",
+                "tablealias" => "vendor2"
+            ],
+            "alias" => "second_vendor"
+        ]
+    ],
+    "from" => "packagist_package",
+    "limit" => 5
+];
+
+$query = [
+  "select" => [
+    [
+      "element" => [
+        "type" => "fld",
+        "table" => "packagist_handle",
+        "field" => "name"
+      ],
+      "alias" => "vendor"
+    ],
+    [
+      "element" => [
+        "type" => "subquery",
+        "query" => [
+          "select" => [
+            [
+              "element" => [
+                "type" => "fn",
+                "function" => "COUNT",
+                "params" => [
+                  [ "type" => "fld", "table" => "packagist_package", "field" => "id" ]
+                ]
+              ],
+              "alias" => "package_count"
+            ]
+          ],
+          "from" => "packagist_package",
+          "where" => [
+            "type" => "op",
+            "operator" => "=",
+            "params" => [
+              [ "type" => "fld", "table" => "packagist_package", "field" => "handle_id" ],
+              [ "type" => "fld", "table" => "packagist_handle", "field" => "id" ]
+            ]
+          ]
+        ]
+      ],
+      "alias" => "package_count"
+    ]
+  ],
+  // "from" => "packagist_handle",
+  "limit" => 10
+];
 
