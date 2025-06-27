@@ -5,14 +5,14 @@ namespace DataHawk\Content;
 use Base3\Api\IOutput;
 use DataHawk\Api\IDataQueryService;
 
-class TestOutput implements IOutput {
+class TestOutput2 implements IOutput {
 
     public function __construct(
         private readonly IDataQueryService $dataqueryservice
     ) {}
 
     public static function getName(): string {
-        return 'testoutput';
+        return 'testoutput2';
     }
 
     public function getOutput($out = "html") {
@@ -28,6 +28,106 @@ class TestOutput implements IOutput {
 
         // Testfälle definieren
         $testCases = [
+
+            // Subquery mit COUNT
+            [
+                "title" => "Subquery COUNT(packages) per vendor",
+                "query" => [
+                    "select" => [
+                        [
+                            "element" => [ "type" => "fld", "table" => "packagist_handle", "field" => "name" ],
+                            "alias" => "vendor"
+                        ],
+                        [
+                            "element" => [
+                                "type" => "subquery",
+                                "query" => [
+                                    "select" => [
+                                        [
+                                            "element" => [
+                                                "type" => "fn",
+                                                "function" => "COUNT",
+                                                "params" => [
+                                                    [ "type" => "fld", "table" => "packagist_package", "field" => "id" ]
+                                                ]
+                                            ],
+                                            "alias" => "package_count"
+                                        ]
+                                    ],
+                                    "from" => "packagist_package",
+                                    "where" => [
+                                        "type" => "op",
+                                        "operator" => "=",
+                                        "params" => [
+                                            [ "type" => "fld", "table" => "packagist_package", "field" => "handle_id" ],
+                                            [ "type" => "fld", "table" => "packagist_handle", "field" => "id" ]
+                                        ]
+                                    ]
+                                ]
+                            ],
+                            "alias" => "package_count"
+                        ]
+                    ],
+                    "from" => "packagist_handle",
+                    "limit" => 10
+                ]
+            ],
+
+            // IS NOT NULL & BETWEEN
+            [
+                "title" => "IS NOT NULL + BETWEEN",
+                "query" => [
+                    "select" => [
+                        [
+                            "element" => [ "type" => "fld", "table" => "packagist_package", "field" => "name" ]
+                        ]
+                    ],
+                    "from" => "packagist_package",
+                    "where" => [
+                        "type" => "op",
+                        "operator" => "AND",
+                        "params" => [
+                            [
+                                "type" => "op",
+                                "operator" => "IS NOT NULL",
+                                "params" => [
+                                    [ "type" => "fld", "table" => "packagist_package", "field" => "description" ]
+                                ]
+                            ],
+                            [
+                                "type" => "op",
+                                "operator" => "BETWEEN",
+                                "params" => [
+                                    [ "type" => "fld", "table" => "packagist_package", "field" => "downloads" ],
+                                    1,
+                                    100
+                                ]
+                            ]
+                        ]
+                    ],
+                    "limit" => 5
+                ]
+            ],
+
+            // REGEXP
+            [
+                "title" => "REGEXP match vendor",
+                "query" => [
+                    "select" => [
+                        [ "element" => [ "type" => "fld", "table" => "packagist_handle", "field" => "name" ] ]
+                    ],
+                    "from" => "packagist_handle",
+                    "where" => [
+                        "type" => "op",
+                        "operator" => "REGEXP",
+                        "params" => [
+                            [ "type" => "fld", "table" => "packagist_handle", "field" => "name" ],
+                            "^ddbase3"
+                        ]
+                    ],
+                    "limit" => 5
+                ]
+            ],
 
 [ "title" => "double join", "query" => [
     "select" => [
@@ -170,7 +270,7 @@ class TestOutput implements IOutput {
     }
 
     public function getHelp() {
-        return 'Help of TestOutput' . "\n";
+        return 'Help of TestOutput2' . "\n";
     }
 }
 
