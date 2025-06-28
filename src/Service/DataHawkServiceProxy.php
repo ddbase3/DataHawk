@@ -3,6 +3,8 @@
 namespace DataHawk\Service;
 
 use DataHawk\Api\IReportQueryService;
+use DataHawk\Dto\TableMetadata;
+use DataHawk\Dto\QueryResult;
 
 class DataHawkServiceProxy implements IReportQueryService {
 
