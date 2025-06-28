@@ -2,13 +2,24 @@
 
 namespace DataHawk\Schema;
 
+use Base3\Configuration\Api\IConfiguration;
 use DataHawk\Api\IReportSchemaProvider;
 use DataHawk\Dto\TableMetadata;
 use DataHawk\Dto\FieldMetadata;
 use DataHawk\Dto\JoinMetadata;
+use DataHawk\Dto\ForeignKeyReference;
 
 class DefaultReportSchemaProvider implements IReportSchemaProvider
 {
+    private string $schemaDir;
+
+    /** @var TableMetadata[]|null */
+    private ?array $cachedSchema = null;
+
+    public function __construct(private readonly IConfiguration $configuration) {
+        $this->schemaDir = $this->getDataDir();
+    }
+
     /**
      * Returns all defined tables.
      *
@@ -16,17 +27,25 @@ class DefaultReportSchemaProvider implements IReportSchemaProvider
      */
     public function getSchema(): array
     {
-        return [
-            $this->getPackagistHandleTable(),
-            $this->getPackagistPackageTable()
-        ];
+        if ($this->cachedSchema !== null) {
+            return $this->cachedSchema;
+        }
+
+        $tables = [];
+
+        foreach (glob($this->schemaDir . '/*.json') as $file) {
+            $json = file_get_contents($file);
+            $data = json_decode($json, true);
+            if (!is_array($data)) continue;
+
+            $tables[] = $this->deserializeTableMetadata($data);
+        }
+
+        return $this->cachedSchema = $tables;
     }
 
     /**
      * Returns a specific table by name, or null if not found.
-     *
-     * @param string $tableName
-     * @return TableMetadata|null
      */
     public function getTable(string $tableName): ?TableMetadata
     {
@@ -38,61 +57,59 @@ class DefaultReportSchemaProvider implements IReportSchemaProvider
         return null;
     }
 
-    private function getPackagistHandleTable(): TableMetadata
+    /**
+     * Constructs a TableMetadata DTO from array.
+     */
+    private function deserializeTableMetadata(array $data): TableMetadata
     {
+        $fields = array_map(function ($f) {
+            return new FieldMetadata(
+                name: $f['name'],
+                type: $f['type'],
+                description: $f['description'] ?? null,
+                primaryKey: $f['primaryKey'] ?? false,
+                foreignKey: isset($f['foreignKey'])
+                    ? new ForeignKeyReference(
+                        table: $f['foreignKey']['table'],
+                        column: $f['foreignKey']['column']
+                    )
+                    : null,
+                nullable: $f['nullable'] ?? true,
+                tags: $f['tags'] ?? []
+            );
+        }, $data['fields'] ?? []);
+
+        $joins = array_map(function ($j) {
+            return new JoinMetadata(
+                targetTable: $j['targetTable'],
+                on: $j['on'],
+                type: $j['type'] ?? 'INNER',
+                meta: $j['meta'] ?? []
+            );
+        }, $data['joins'] ?? []);
+
         return new TableMetadata(
-            name: 'packagist_handle',
-            label: 'Packagist Handle',
-            description: 'Information about vendor handles in Packagist',
-            domain: 'packagist',
-            category: 'metadata',
-            tags: ['handle', 'vendor', 'namespace'],
-            fields: [
-                new FieldMetadata('id', 'integer', 'Primary key', true),
-                new FieldMetadata('name', 'string', 'Vendor name'),
-                new FieldMetadata('lastcall', 'datetime', 'Last API call timestamp')
-            ],
-            joins: [],
-            defaultFilters: []
+            name: $data['name'] ?? '',
+            label: $data['label'] ?? null,
+            description: $data['description'] ?? null,
+            domain: $data['domain'] ?? '',
+            category: $data['category'] ?? '',
+            tags: $data['tags'] ?? [],
+            fields: $fields,
+            joins: $joins,
+            defaultFilters: $data['defaultFilters'] ?? []
         );
     }
 
-    private function getPackagistPackageTable(): TableMetadata
+    /**
+     * Resolves configured directory for schema files.
+     */
+    private function getDataDir(): string
     {
-        return new TableMetadata(
-            name: 'packagist_package',
-            label: 'Packagist Package',
-            description: 'Individual packages listed in Packagist under a handle',
-            domain: 'packagist',
-            category: 'metrics',
-            tags: ['package', 'downloads', 'repository'],
-            fields: [
-                new FieldMetadata('id', 'integer', 'Primary key', true),
-                new FieldMetadata('handle_id', 'integer', 'Foreign key to handle'),
-                new FieldMetadata('name', 'string', 'Package name'),
-                new FieldMetadata('url', 'string', 'Package URL'),
-                new FieldMetadata('description', 'text', 'Package description'),
-                new FieldMetadata('downloads', 'integer', 'Total downloads'),
-                new FieldMetadata('downloads_monthly', 'integer', 'Downloads this month'),
-                new FieldMetadata('downloads_daily', 'integer', 'Downloads today'),
-                new FieldMetadata('favers', 'integer', 'Number of favorites'),
-                new FieldMetadata('repository', 'string', 'Repository URL')
-            ],
-            joins: [
-                new JoinMetadata(
-                    targetTable: 'packagist_handle',
-                    on: ['packagist_package.handle_id' => 'packagist_handle.id'],
-                    type: 'INNER'
-                ),
-                new JoinMetadata(
-                    targetTable: 'packagist_handle',
-                    on: ['packagist_package.handle_id' => 'packagist_handle.id'],
-                    type: 'LEFT',
-                    meta: ['default' => true]
-                )
-            ],
-            defaultFilters: []
-        );
+        $directories = $this->configuration->get('directories');
+        return isset($directories['data'])
+            ? rtrim($directories['data'], DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'datahawk' . DIRECTORY_SEPARATOR
+            : '';
     }
 }
 
