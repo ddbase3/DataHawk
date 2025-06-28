@@ -39,7 +39,7 @@ class DataHawkPlugin implements IPlugin {
 				IReportQueryCompiler::class,
 				fn($c) => new ReportQueryCompiler(
 					$c->get(IReportSchemaProvider::class)),
-				IContainer::SHARED)
+				IContainer::SHARED | IContainer::NOOVERWRITE)
 
 			->set(
 				IReportQueryService::class,
@@ -47,6 +47,6 @@ class DataHawkPlugin implements IPlugin {
 					$c->get(IReportSchemaProvider::class),
 					$c->get(IReportQueryCompiler::class),
 					$c),
-				IContainer::SHARED);
+				IContainer::SHARED | IContainer::NOOVERWRITE);
 	}
 }
