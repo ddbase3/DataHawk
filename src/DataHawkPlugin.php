@@ -2,15 +2,18 @@
 
 namespace DataHawk;
 
+use Base3\Api\IClassMap;
 use Base3\Api\IContainer;
 use Base3\Api\IPlugin;
 use Base3\Configuration\Api\IConfiguration;
 use DataHawk\Api\IReportQueryService;
 use DataHawk\Api\IReportSchemaProvider;
 use DataHawk\Api\IReportQueryCompiler;
+use DataHawk\Api\IReportExporterFactory;
 use DataHawk\Service\DefaultReportQueryService;
 use DataHawk\Schema\DefaultReportSchemaProvider;
 use DataHawk\Compiler\ReportQueryCompiler;
+use DataHawk\Service\ReportExporterFactory;
 
 class DataHawkPlugin implements IPlugin {
 
@@ -47,6 +50,11 @@ class DataHawkPlugin implements IPlugin {
 					$c->get(IReportSchemaProvider::class),
 					$c->get(IReportQueryCompiler::class),
 					$c),
+				IContainer::SHARED | IContainer::NOOVERWRITE)
+
+			->set(
+				IReportExporterFactory::class,
+				fn($c) => new ReportExporterFactory($c->get(IClassMap::class)),
 				IContainer::SHARED | IContainer::NOOVERWRITE);
 	}
 }

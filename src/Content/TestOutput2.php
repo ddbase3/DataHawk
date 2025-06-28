@@ -4,11 +4,13 @@ namespace DataHawk\Content;
 
 use Base3\Api\IOutput;
 use DataHawk\Api\IReportQueryService;
+use DataHawk\Api\IReportExporterFactory;
 
 class TestOutput2 implements IOutput {
 
     public function __construct(
-        private readonly IReportQueryService $dataqueryservice
+        private readonly IReportQueryService $dataqueryservice,
+        private readonly IReportExporterFactory $reportexporterfactory
     ) {}
 
     public static function getName(): string {
@@ -60,7 +62,7 @@ class TestOutput2 implements IOutput {
                                         "operator" => "=",
                                         "params" => [
                                             [ "type" => "fld", "table" => "packagist_package", "field" => "handle_id" ],
-                                            [ "type" => "fld", "table" => "packagist_handle", "field" => "id" ]
+                                            [ "type" => "fld", "table" => "packagist_handle", "field" => "id", "variant" => "required" ]
                                         ]
                                     ]
                                 ]
@@ -239,28 +241,19 @@ class TestOutput2 implements IOutput {
         foreach ($testCases as $index => $test) {
             $out .= "<hr><h2>🧪 Test #" . ($index + 1) . ": " . htmlspecialchars($test['title']) . "</h2>";
 
-            try {
-                $result = $this->dataqueryservice->executeQuery($test['query']);
-
+	    try {
                 // Query anzeigen
                 $out .= "<h3>🧾 Query JSON</h3><pre>" . htmlspecialchars(json_encode($test['query'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) . "</pre>";
-                $out .= "<h3>🧠 Generated SQL</h3><pre>" . htmlspecialchars($result->debugSql ?? '[n/a]') . "</pre>";
 
                 // Ergebnis-Tabelle
-                $out .= "<table border='1' cellpadding='4' cellspacing='0'><thead><tr>";
-                foreach ($result->columns as $col) {
-                    $out .= "<th>{$col['name']}</th>";
-                }
-                $out .= "</tr></thead><tbody>";
-                foreach ($result->rows as $row) {
-                    $out .= "<tr>";
-                    foreach ($row as $cell) {
-                        $out .= "<td>" . htmlspecialchars((string)$cell) . "</td>";
-                    }
-                    $out .= "</tr>";
-                }
-                $out .= "</tbody></table>";
+		$exporter = $this->reportexporterfactory->createExporter('htmltablereportexporter');
+		$out .= $exporter->setExportQuery($test['query'])->toString();
 
+		// SQL-Statement
+		$result = $exporter->getResult();
+		if ($result != null) {
+		        $out .= "<h3>🧠 Generated SQL</h3><pre>" . htmlspecialchars($result->debugSql ?? '[n/a]') . "</pre>";
+		}
             } catch (\Throwable $e) {
                 $out .= "<p style='color:red;'>❌ Query failed: " . htmlspecialchars($e->getMessage()) . "</p>";
             }
