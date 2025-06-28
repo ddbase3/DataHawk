@@ -2,6 +2,7 @@
 
 namespace DataHawk\Service;
 
+use Base3\Microservice\Api\IMicroserviceConnector;
 use Base3\Microservice\AbstractMicroservice;
 use DataHawk\Api\IReportQueryService;
 use DataHawk\Dto\TableMetadata;
@@ -9,12 +10,9 @@ use DataHawk\Dto\QueryResult;
 
 class DataHawkMicroservice extends AbstractMicroservice implements IReportQueryService {
 
-	private $service;
-
-        public function __construct() {
-		$servicelocator = \Base3\ServiceLocator::getInstance();
-		$this->service = $servicelocator->get(IReportQueryService::class);
-	}
+	public function __construct(
+		private readonly IReportQueryService|IMicroserviceConnector $service
+	) {}
 
 	// Implementation of IReportQueryService
 
