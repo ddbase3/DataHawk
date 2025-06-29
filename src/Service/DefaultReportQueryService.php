@@ -21,7 +21,7 @@ class DefaultReportQueryService implements IReportQueryService
         private IReportQueryCompiler $querycompiler,
         private IContainer $container
     ) {
-        $this->database = $this->container->get('database');
+        $this->database = $container->get('database');
     }
 
     /**
