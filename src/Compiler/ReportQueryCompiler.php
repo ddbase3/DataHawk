@@ -38,86 +38,126 @@ class ReportQueryCompiler implements IReportQueryCompiler
         }
     }
 
-    public function compile(array $query): SqlQuery
-    {
-        $this->aliasUsage = [];
-        $this->tableAliases = [];
+public function compile(array $query): SqlQuery
+{
+    $this->aliasUsage = [];
+    $this->tableAliases = [];
 
-        if (!isset($query['select'], $query['from'])) {
-            throw new QueryValidationException("Query must contain 'select' and 'from'.");
-        }
-
-        $this->collectAliasUsage($query);
-
-        $from = $query['from'];
-
-        $joinRequests = [];
-        $elementSources = array_merge(
-            $query['select'] ?? [],
-            $query['group_by'] ?? [],
-            $query['order_by'] ?? [],
-            isset($query['where']) ? [$query['where']] : [],
-            isset($query['having']) ? [$query['having']] : []
-        );
-        $this->collectJoinDependencies($elementSources, $joinRequests);
-
-        $selectParts = [];
-        foreach ($query['select'] as $entry) {
-            if (!isset($entry['element'])) {
-                throw new QueryValidationException("Missing element in select entry.");
-            }
-            $sqlExpr = $this->compileElement($entry['element']);
-            if (isset($entry['alias'])) {
-                $sqlExpr .= ' AS ' . $this->quoteIdentifier($entry['alias']);
-            }
-            $selectParts[] = $sqlExpr;
-        }
-
-        $sql = 'SELECT ' . implode(', ', $selectParts);
-        $sql .= ' FROM ' . $this->quoteIdentifier($from);
-        $sql .= $this->compileJoins($from, $joinRequests);
-
-        if (isset($query['where'])) {
-            $sql .= ' WHERE ' . $this->compileElement($query['where']);
-        }
-
-        if (isset($query['group_by']) && is_array($query['group_by'])) {
-            $groupParts = array_map(fn($el) => $this->compileElement($el), $query['group_by']);
-            $sql .= ' GROUP BY ' . implode(', ', $groupParts);
-        }
-
-        if (isset($query['having'])) {
-            $sql .= ' HAVING ' . $this->compileElement($query['having']);
-        }
-
-        if (isset($query['order_by']) && is_array($query['order_by'])) {
-            $orderParts = [];
-            foreach ($query['order_by'] as $order) {
-                if (!isset($order['element'])) {
-                    throw new QueryValidationException("Missing element in order_by clause.");
-                }
-                $expr = $this->compileElement($order['element']);
-                $dir = strtoupper($order['direction'] ?? 'ASC');
-                if (!in_array($dir, ['ASC', 'DESC'])) {
-                    throw new QueryValidationException("Invalid order direction: $dir");
-                }
-                $orderParts[] = $expr . ' ' . $dir;
-            }
-            $sql .= ' ORDER BY ' . implode(', ', $orderParts);
-        }
-
-        if (isset($query['limit'])) {
-            $sql .= ' LIMIT ' . (int)$query['limit'];
-        }
-        if (isset($query['offset'])) {
-            $sql .= ' OFFSET ' . (int)$query['offset'];
-        }
-
-        return new SqlQuery($sql);
+    if (!isset($query['select'], $query['from'])) {
+        throw new QueryValidationException("Query must contain 'select' and 'from'.");
     }
 
-    private function collectAliasUsage(array $query): void
-    {
+    $this->collectAliasUsage($query);
+
+    $from = $query['from'];
+
+    $joinRequests = [];
+    $elementSources = array_merge(
+        $query['select'] ?? [],
+        $query['group_by'] ?? [],
+        $query['order_by'] ?? [],
+        isset($query['where']) ? [$query['where']] : [],
+        isset($query['having']) ? [$query['having']] : []
+    );
+    $this->collectJoinDependencies($elementSources, $joinRequests);
+
+    $selectParts = [];
+    $compiledFields = [];
+    $isSensitiveQuery = false;
+
+    // Map of table name => TableMetadata
+    $tableMetaMap = [];
+    foreach ($this->schemaprovider->getSchema() as $tableMeta) {
+        $tableMetaMap[$tableMeta->name] = $tableMeta;
+    }
+
+    foreach ($query['select'] as $entry) {
+        if (!isset($entry['element'])) {
+            throw new QueryValidationException("Missing element in select entry.");
+        }
+
+        $element = $entry['element'];
+        $table = $element['table'] ?? null;
+        $fieldName = $element['field'] ?? null;
+        $alias = $entry['alias'] ?? $element['alias'] ?? null;
+
+        $sqlExpr = $this->compileElement($element);
+        if ($alias) {
+            $sqlExpr .= ' AS ' . $this->quoteIdentifier($alias);
+        }
+
+        // Sensitivity check: table or field
+        $tableMeta = $tableMetaMap[$table] ?? null;
+        $tableSensitive = $tableMeta?->sensitive ?? false;
+        $fieldSensitive = false;
+
+        foreach ($tableMeta?->fields ?? [] as $fieldMeta) {
+            if ($fieldMeta->name === $fieldName) {
+                $fieldSensitive = $fieldMeta->sensitive || $tableSensitive;
+                break;
+            }
+        }
+
+        if ($fieldSensitive) {
+            $isSensitiveQuery = true;
+        }
+
+        $compiledFields[] = [
+            'name'      => $fieldName,
+            'alias'     => $alias,
+            'table'     => $table,
+            'type'      => $element['type'] ?? null,
+            'sensitive' => $fieldSensitive,
+        ];
+
+        $selectParts[] = $sqlExpr;
+    }
+
+    $sql = 'SELECT ' . implode(', ', $selectParts);
+    $sql .= ' FROM ' . $this->quoteIdentifier($from);
+    $sql .= $this->compileJoins($from, $joinRequests);
+
+    if (isset($query['where'])) {
+        $sql .= ' WHERE ' . $this->compileElement($query['where']);
+    }
+
+    if (isset($query['group_by']) && is_array($query['group_by'])) {
+        $groupParts = array_map(fn($el) => $this->compileElement($el), $query['group_by']);
+        $sql .= ' GROUP BY ' . implode(', ', $groupParts);
+    }
+
+    if (isset($query['having'])) {
+        $sql .= ' HAVING ' . $this->compileElement($query['having']);
+    }
+
+    if (isset($query['order_by']) && is_array($query['order_by'])) {
+        $orderParts = [];
+        foreach ($query['order_by'] as $order) {
+            if (!isset($order['element'])) {
+                throw new QueryValidationException("Missing element in order_by clause.");
+            }
+            $expr = $this->compileElement($order['element']);
+            $dir = strtoupper($order['direction'] ?? 'ASC');
+            if (!in_array($dir, ['ASC', 'DESC'])) {
+                throw new QueryValidationException("Invalid order direction: $dir");
+            }
+            $orderParts[] = $expr . ' ' . $dir;
+        }
+        $sql .= ' ORDER BY ' . implode(', ', $orderParts);
+    }
+
+    if (isset($query['limit'])) {
+        $sql .= ' LIMIT ' . (int)$query['limit'];
+    }
+
+    if (isset($query['offset'])) {
+        $sql .= ' OFFSET ' . (int)$query['offset'];
+    }
+
+    return new SqlQuery($sql, [], $compiledFields, $isSensitiveQuery);
+}
+
+    private function collectAliasUsage(array $query): void {
         $nodes = array_merge(
             $query['select'] ?? [],
             $query['group_by'] ?? [],
@@ -126,13 +166,10 @@ class ReportQueryCompiler implements IReportQueryCompiler
             isset($query['having']) ? [$query['having']] : []
         );
 
-        foreach ($nodes as $node) {
-            $this->scanForAliases($node);
-        }
+        foreach ($nodes as $node) $this->scanForAliases($node);
     }
 
-    private function scanForAliases(mixed $node): void
-    {
+    private function scanForAliases(mixed $node): void {
         if (!is_array($node)) return;
 
         if (isset($node['type']) && $node['type'] === 'fld') {
@@ -142,48 +179,21 @@ class ReportQueryCompiler implements IReportQueryCompiler
         }
 
         foreach ($node as $child) {
-            if (is_array($child)) {
-                $this->scanForAliases($child);
-            }
+            if (!is_array($child)) continue;
+            $this->scanForAliases($child);
         }
     }
 
-/*
-    private function collectJoinDependencies(array $nodes, array &$tables): void
-    {
+    private function collectJoinDependencies(array $nodes, array &$tables): void {
         foreach ($nodes as $node) {
             if (is_array($node)) {
                 if (isset($node['type']) && $node['type'] === 'fld') {
                     $table = $node['table'];
                     $alias = $node['tablealias'] ?? $table;
-                    $this->aliasUsage[$table][$alias] = true;
-
-                    if (!empty($node['variant'])) {
-                        $tables[$table] = $node['variant'];
+                    if (!isset($this->aliasUsage[$table])) {
+                        $this->aliasUsage[$table] = [];
                     }
-                }
-                if (isset($node['element'])) {
-                    $this->collectJoinDependencies([$node['element']], $tables);
-                }
-                if (isset($node['params']) && is_array($node['params'])) {
-                    $this->collectJoinDependencies($node['params'], $tables);
-                }
-            }
-        }
-    }
- */
-
-    private function collectJoinDependencies(array $nodes, array &$tables): void
-    {
-        foreach ($nodes as $node) {
-            if (is_array($node)) {
-                if (isset($node['type']) && $node['type'] === 'fld') {
-                    $table = $node['table'];
-                    $alias = $node['tablealias'] ?? $table;
-if (!isset($this->aliasUsage[$table])) {
-    $this->aliasUsage[$table] = [];
-}
-$this->aliasUsage[$table][$alias] = true;
+                    $this->aliasUsage[$table][$alias] = true;
 		    $tables[$table] = $node['variant'] ?? ($tables[$table] ?? null);
                 }
                 if (isset($node['element'])) {
@@ -199,8 +209,7 @@ $this->aliasUsage[$table][$alias] = true;
         }
     }
 
-    private function compileJoins(string $from, array $joinRequests): string
-    {
+    private function compileJoins(string $from, array $joinRequests): string {
         $sql = '';
         $visited = [$from];
 
@@ -258,8 +267,7 @@ $this->aliasUsage[$table][$alias] = true;
         return $sql;
     }
 
-    private function quoteJoinField(string $str, ?string $aliasOverride = null): string
-    {
+    private function quoteJoinField(string $str, ?string $aliasOverride = null): string {
         if (str_contains($str, '.')) {
             [$table, $field] = explode('.', $str, 2);
             $alias = $aliasOverride ?? $this->getAliasForTable($table) ?? $table;
@@ -268,8 +276,7 @@ $this->aliasUsage[$table][$alias] = true;
         return $this->quoteIdentifier($aliasOverride ?? $str);
     }
 
-    private function compileElement($element): string
-    {
+    private function compileElement($element): string {
         if (is_string($element) || is_numeric($element)) {
             return $this->quoteLiteral($element);
         }
@@ -287,15 +294,13 @@ $this->aliasUsage[$table][$alias] = true;
         };
     }
 
-    private function compileField(array $fld): string
-    {
+    private function compileField(array $fld): string {
         $alias = $fld['tablealias'] ?? $this->getAliasForTable($fld['table']) ?? $fld['table'];
         $column = $fld['field'];
         return $this->quoteIdentifier($alias) . '.' . $this->quoteIdentifier($column);
     }
 
-    private function compileFunction(array $fn): string
-    {
+    private function compileFunction(array $fn): string {
         if (!isset($fn['function'], $fn['params'])) {
             throw new QueryValidationException("Function must have 'function' and 'params'.");
         }
@@ -304,8 +309,7 @@ $this->aliasUsage[$table][$alias] = true;
         return strtoupper($fn['function']) . '(' . implode(', ', $args) . ')';
     }
 
-    private function compileOperation(array $op): string
-    {
+    private function compileOperation(array $op): string {
         $opName = strtoupper($op['operator'] ?? '');
         $params = $op['params'] ?? [];
 
@@ -318,8 +322,7 @@ $this->aliasUsage[$table][$alias] = true;
         };
     }
 
-    private function compileSubquery(array $sub): string
-    {
+    private function compileSubquery(array $sub): string {
         if (!isset($sub['query'])) {
             throw new QueryValidationException("Subquery must have 'query'.");
         }
@@ -328,21 +331,18 @@ $this->aliasUsage[$table][$alias] = true;
         return '(' . $compiled->sql . ')';
     }
 
-    private function quoteIdentifier(string $str): string
-    {
+    private function quoteIdentifier(string $str): string {
         return '`' . str_replace('`', '``', $str) . '`';
     }
 
-    private function getAliasForTable(string $table): ?string
-    {
+    private function getAliasForTable(string $table): ?string {
         foreach ($this->tableAliases as $alias => $mappedTable) {
             if ($mappedTable === $table) return $alias;
         }
         return null;
     }
 
-    private function quoteLiteral(string|int|float|bool|null $value): string
-    {
+    private function quoteLiteral(string|int|float|bool|null $value): string {
         if (is_null($value)) return 'NULL';
         if (is_bool($value)) return $value ? 'TRUE' : 'FALSE';
         return is_numeric($value) ? (string)$value : "'" . str_replace("'", "''", (string)$value) . "'";

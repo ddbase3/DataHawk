@@ -75,7 +75,9 @@ class DefaultReportSchemaProvider implements IReportSchemaProvider
                     )
                     : null,
                 nullable: $f['nullable'] ?? true,
-                tags: $f['tags'] ?? []
+		tags: $f['tags'] ?? [],
+		alias: $f['alias'] ?? null,
+		sensitive: $f['sensitive'] ?? false
             );
         }, $data['fields'] ?? []);
 
@@ -97,7 +99,8 @@ class DefaultReportSchemaProvider implements IReportSchemaProvider
             tags: $data['tags'] ?? [],
             fields: $fields,
             joins: $joins,
-            defaultFilters: $data['defaultFilters'] ?? []
+            defaultFilters: $data['defaultFilters'] ?? [],
+            sensitive: $data['sensitive'] ?? false
         );
     }
 

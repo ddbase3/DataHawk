@@ -13,7 +13,8 @@ class TableMetadata
         public array $tags = [],
         public array $fields = [],           // FieldMetadata[]
         public array $joins = [],            // JoinMetadata[]
-        public array $defaultFilters = []    // FilterCondition[]
+	public array $defaultFilters = [],   // FilterCondition[]
+	public bool $sensitive = false
     ) {}
 }
 

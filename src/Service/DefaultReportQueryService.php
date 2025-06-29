@@ -49,27 +49,52 @@ class DefaultReportQueryService implements IReportQueryService
      */
     public function executeQuery(array $queryJson): QueryResult
     {
-        // 1. Compile query into SQL string
+        // 1. Compile query into SQL string and metadata
         $sqlQuery = $this->querycompiler->compile($queryJson);
 
         // 2. Run query via IDatabase service
         try {
             $this->database->connect();
-            $rows = $this->database->multiQuery($sqlQuery->sql);
+            $rows = $this->database->multiQuery($sqlQuery->sql, $sqlQuery->params);
         } catch (\Throwable $e) {
             return new QueryResult([], [], $sqlQuery->sql . "\n\n❌ DB Error: " . $e->getMessage());
         }
 
-        // 3. Derive columns from result set
-        $columns = [];
-        if (!empty($rows)) {
-            foreach (array_keys($rows[0]) as $name) {
-                $type = gettype($rows[0][$name]);
-                $columns[] = ['name' => $name, 'type' => $type];
+        // 3. check integrity
+        if (count($rows)) {
+            $compiledFields = $sqlQuery->fields;
+            $firstRow = $rows[0] ?? [];
+            $expectedKeys = array_map(fn($f) => $f['alias'] ?? $f['name'], $compiledFields);
+            $actualKeys = array_keys($firstRow);
+            if (count($expectedKeys) !== count($actualKeys) || array_diff($expectedKeys, $actualKeys)) {
+                throw new \RuntimeException("Query result column mismatch: expected [" . implode(', ', $expectedKeys) . "], got [" . implode(', ', $actualKeys) . "]");
             }
         }
 
-        return new QueryResult($columns, $rows, $sqlQuery->sql);
+        // 4. Build columns using aliases from compiled fields
+        $columns = [];
+        $firstRow = $rows[0] ?? [];
+        $compiledFields = $sqlQuery->fields;
+
+        foreach (array_keys($firstRow) as $i => $colName) {
+            $field = $compiledFields[$i] ?? null;
+
+            $name = $field['alias'] ?? $field['name'] ?? $colName;
+            $type = gettype($firstRow[$colName]);
+
+            $columns[] = [
+                'name' => $name,
+                'type' => $type,
+                'field' => $field['name'] ?? null,
+                'alias' => $field['alias'] ?? null,
+		'table' => $field['table'] ?? null,
+		'sensitive' => $field['sensitive'] ?? false,
+            ];
+        }
+
+	$isSensitive = in_array(true, array_column($columns, 'sensitive'), true);
+
+        return new QueryResult($columns, $rows, $sqlQuery->sql, $isSensitive);
     }
 
     /**
