@@ -50,6 +50,13 @@ interface IReportExporter extends IBase {
 	public function toFile(string $filePath): self;
 
 	/**
+	 * Returns the sql statement for debugging.
+	 *
+	 * @retrn string
+	 */
+	public function toSql(): string;
+
+	/**
 	 * Returns the MIME type of the exported content.
 	 *
 	 * @return string

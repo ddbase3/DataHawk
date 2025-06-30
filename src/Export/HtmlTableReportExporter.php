@@ -73,6 +73,10 @@ class HtmlTableReportExporter implements IReportExporter {
 		return $this;
 	}
 
+	public function toSql(): string {
+		return $this->result->debugSql ?? '';
+	}
+
 	public function getMimeType(): string {
 		return 'text/html';
 	}
