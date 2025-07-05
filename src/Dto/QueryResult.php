@@ -13,6 +13,7 @@ class QueryResult
      *       'field' => ?string,    // original field name (optional)
      *       'alias' => ?string,    // SQL alias if used
      *       'table' => ?string     // table source if known
+     *       'sensitive' => bool    // contains sensitive data
      *     ],
      *     ...
      *   ]
