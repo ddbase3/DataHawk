@@ -13,7 +13,7 @@ class FieldMetadata
         public bool $nullable = true,
         public array $tags = [],
         public ?string $alias = null,
-        public bool $sensitive = false
+	public bool $sensitive = false
     ) {}
 }
 

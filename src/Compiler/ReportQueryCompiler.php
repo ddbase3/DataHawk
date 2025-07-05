@@ -81,7 +81,8 @@ public function compile(array $query): SqlQuery
         $fieldName = $element['field'] ?? null;
         $alias = $entry['alias'] ?? $element['alias'] ?? null;
 
-        $sqlExpr = $this->compileElement($element);
+        $sqlExpr = !empty($entry['distinct']) && empty($query['distinct']) ? 'DISTINCT ' : '';
+        $sqlExpr .= $this->compileElement($element);
         if ($alias) {
             $sqlExpr .= ' AS ' . $this->quoteIdentifier($alias);
         }
@@ -107,13 +108,16 @@ public function compile(array $query): SqlQuery
             'alias'     => $alias,
             'table'     => $table,
             'type'      => $element['type'] ?? null,
-            'sensitive' => $fieldSensitive,
+            'distinct'  => !empty($entry['distinct']) || !empty($query['distinct']),
+	    'sensitive' => $fieldSensitive,
         ];
 
         $selectParts[] = $sqlExpr;
     }
 
-    $sql = 'SELECT ' . implode(', ', $selectParts);
+    $selectModifier = !empty($query['distinct']) ? 'DISTINCT ' : '';
+    $sql = 'SELECT ' . $selectModifier . implode(', ', $selectParts);
+
     $sql .= ' FROM ' . $this->quoteIdentifier($from);
     $sql .= $this->compileJoins($from, $joinRequests);
 
@@ -282,7 +286,7 @@ public function compile(array $query): SqlQuery
         }
 
         if (!is_array($element) || !isset($element['type'])) {
-            throw new QueryValidationException("Invalid element structure.");
+            throw new QueryValidationException("Invalid element structure: " . print_r($element, true));
         }
 
         return match ($element['type']) {
