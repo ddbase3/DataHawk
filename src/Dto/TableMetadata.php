@@ -14,7 +14,8 @@ class TableMetadata
         public array $fields = [],           // FieldMetadata[]
         public array $joins = [],            // JoinMetadata[]
 	public array $defaultFilters = [],   // FilterCondition[]
-	public bool $sensitive = false
+	public bool $sensitive = false,
+	public array $position = []
     ) {}
 }
 
