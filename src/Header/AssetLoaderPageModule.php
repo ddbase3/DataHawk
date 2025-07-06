@@ -15,7 +15,7 @@ class AssetLoaderPageModule extends AbstractModuleHeader {
 
 	public function getHtml() {
 		$elems = [];
-		$elems[] = '<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>';
+		// $elems[] = '<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>';
 		$elems[] = '<script src="' . $this->assetresolver->resolve('plugin/DataHawk/assets/assetloader/assetloader.min.js') . '"></script>';
 		return implode("\n", $elems);
 	}
