@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DDL Query Extensions",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "select", "insert", "update", "delete",
+        "create_table", "drop_table", "truncate_table",
+        "rename_table", "alter_table"
+      ]
+    },
+    "table": { "type": "string" },
+    "new_table": { "type": "string" },
+    "alterations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": { "type": "string", "enum": ["add_key", "drop_key", "modify_key"] },
+          "key_type": { "type": "string", "enum": ["primary", "unique", "foreign"] },
+          "columns": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "references": {
+            "type": "object",
+            "required": ["table", "columns"],
+            "properties": {
+              "table": { "type": "string" },
+              "columns": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

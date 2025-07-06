@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Structured Query Definition",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["select", "insert", "update", "delete"]
+    },
+    "table": {
+      "type": "string"
+    },
+    "from": {
+      "type": "string"
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["element", "alias"],
+        "properties": {
+          "alias": { "type": "string" },
+          "element": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" },
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                  "type": { "type": "string", "enum": ["fld", "fn", "op"] },
+                  "table": { "type": "string" },
+                  "field": { "type": "string" },
+                  "tablealias": { "type": "string" },
+                  "function": { "type": "string" },
+                  "operator": { "type": "string" },
+                  "params": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/element" }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "where": { "$ref": "#/$defs/element" },
+    "group_by": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fieldref" }
+    },
+    "order_by": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["element"],
+        "properties": {
+          "element": { "$ref": "#/$defs/fieldref" },
+          "direction": { "type": "string", "enum": ["asc", "desc"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "element": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "type": "string", "enum": ["fld", "fn", "op"] },
+            "table": { "type": "string" },
+            "field": { "type": "string" },
+            "tablealias": { "type": "string" },
+            "function": { "type": "string" },
+            "operator": { "type": "string" },
+            "params": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/element" }
+            }
+          }
+        }
+      ]
+    },
+    "fieldref": {
+      "type": "object",
+      "required": ["type", "table", "field"],
+      "properties": {
+        "type": { "const": "fld" },
+        "table": { "type": "string" },
+        "field": { "type": "string" },
+        "tablealias": { "type": "string" }
+      }
+    }
+  }
+}
+

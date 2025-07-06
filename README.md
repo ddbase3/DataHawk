@@ -61,6 +61,202 @@ The **DataHawk** plugin extends the [BASE3](https://github.com/ddbase3/Base3Fram
 
 ---
 
+## 📘 Query Syntax (CRUD in Structured JSON Form)
+
+This system uses a declarative, JSON-based query language to describe database operations. All CRUD operations (`select`, `insert`, `update`, `delete`) follow a uniform, extensible format. This enables simple as well as complex queries with full control over fields, conditions, and data flow.
+
+### 🔑 Base Structure
+
+```json
+{
+  "type": "select" | "insert" | "update" | "delete",
+  ...
+}
+```
+
+---
+
+### 🔍 `SELECT`
+
+```json
+{
+  "type": "select",
+  "fields": [
+    {
+      "element": { "type": "fld", "table": "git_repository", "field": "name" },
+      "alias": "repository_name"
+    },
+    {
+      "element": {
+        "type": "fn",
+        "function": "GROUP_CONCAT",
+        "params": [
+          { "type": "fld", "table": "git_topic", "field": "topic" },
+          ", "
+        ]
+      },
+      "alias": "topics"
+    }
+  ],
+  "from": "git_repository",
+  "where": { ... },
+  "group_by": [ ... ],
+  "order_by": [ ... ]
+}
+```
+
+**Fields:**
+
+* `fields[]`: List of fields with `element` and `alias`.
+* `from`: Starting table of the query.
+* `where`, `group_by`, `order_by`: Optional, similar to SQL.
+
+---
+
+### ✏️ `UPDATE`
+
+```json
+{
+  "type": "update",
+  "table": "git_repository",
+  "fields": [
+    {
+      "element": {
+        "type": "fld",
+        "table": "git_branch",
+        "field": "message"
+      },
+      "alias": "last_commit_message"
+    },
+    {
+      "element": "New description",
+      "alias": "description"
+    }
+  ],
+  "from": "git_branch",
+  "where": {
+    "type": "op",
+    "operator": "=",
+    "params": [
+      { "type": "fld", "table": "git_repository", "field": "id" },
+      42
+    ]
+  }
+}
+```
+
+**Notes:**
+
+* `fields[]`: Specifies which columns (`alias`) in the target table will be updated.
+* `element` can be:
+
+  * a field (`type: "fld"`),
+  * a function expression (`type: "fn"`),
+  * a scalar value (direct).
+* `from`: Optional, e.g. for `UPDATE ... FROM` constructs.
+
+---
+
+### ➕ `INSERT`
+
+```json
+{
+  "type": "insert",
+  "table": "git_repository",
+  "fields": [
+    {
+      "element": "TestRepo",
+      "alias": "name"
+    },
+    {
+      "element": {
+        "type": "fn",
+        "function": "NOW"
+      },
+      "alias": "created_at"
+    }
+  ]
+}
+```
+
+**Notes:**
+
+* Fields define the target columns (`alias`) and their corresponding values (`element`).
+* Order is arbitrary.
+* `element` may be static or dynamic.
+
+---
+
+### 🗑️ `DELETE`
+
+```json
+{
+  "type": "delete",
+  "table": "git_repository",
+  "where": {
+    "type": "op",
+    "operator": "LIKE",
+    "params": [
+      { "type": "fld", "table": "git_repository", "field": "name" },
+      "%Archived%"
+    ]
+  }
+}
+```
+
+**Notes:**
+
+* `table`: Target of the delete operation.
+* `where`: Optional – without condition, all rows will be deleted (use with caution!).
+
+---
+
+### 🔬 `element` – Detailed Structure
+
+```json
+"element": {
+  "type": "fld" | "fn" | "op",
+  ...
+}
+```
+
+**Types:**
+
+* `"fld"` – Access to a field: `table`, `field`, optional `tablealias`.
+* `"fn"` – Function call: `function`, `params[]`.
+* `"op"` – Logical or arithmetic operation: `operator`, `params[]`.
+* **Scalars** like `42`, `"Test"`, `true`, `null` are allowed directly.
+
+---
+
+### 🧠 Examples for `element`
+
+| Type      | Example (JSON)                                          |
+| --------- | ------------------------------------------------------- |
+| Field     | `{ "type": "fld", "table": "users", "field": "email" }` |
+| Function  | `{ "type": "fn", "function": "NOW" }`                   |
+| Operation | `{ "type": "op", "operator": "+", "params": [1, 2] }`   |
+| Scalar    | `"Hello"`                                               |
+
+---
+
+### 🔄 Advantages of the Structure
+
+* 🔁 **Uniform**: All CRUD operations use the same `fields[]` structure.
+* 🔄 **Flexible**: `element` can contain arbitrary expressions or values.
+* 🔌 **Extensible**: Later extensions like `upsert`, `merge`, `bulk`, etc. are supported.
+* 🔐 **Clear Separation**: Target (`alias`) and source (`element`) are clearly separated.
+
+---
+
+### 📎 Further Notes
+
+* JOINs are generated automatically if table fields are logically connected.
+* Alias conflicts and ambiguities are avoided through clear `table`/`alias` specification.
+* Extensions like `limit`, `offset`, `having` can be easily added.
+
+---
+
 ## Roadmap / Future Ideas
 
 * Export filtering/masking based on sensitivity
