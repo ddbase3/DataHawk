@@ -44,9 +44,12 @@ class MysqlReportQueryCompiler implements IReportQueryCompiler
 		$this->tableAliases = [];
 		$this->firstTableUsed = null;
 
-		// Query muss mindestens SELECT enthalten
-		if (empty($query['select']) || !is_array($query['select'])) {
-			throw new QueryValidationException("Query must contain a non-empty 'select' array.");
+		if (($query['type'] ?? null) !== 'select') {
+			throw new QueryValidationException("Unsupported query type: " . ($query['type'] ?? '[not defined]'));
+		}
+
+		if (empty($query['fields']) || !is_array($query['fields'])) {
+			throw new QueryValidationException("Query must contain a non-empty 'fields' array.");
 		}
 
 		// Tabelle(n) scannen und Alias-Usage + erste Tabelle erfassen
@@ -61,7 +64,7 @@ class MysqlReportQueryCompiler implements IReportQueryCompiler
 		// Join-Bedarf aus allen Elementen analysieren
 		$joinRequests = [];
 		$elementSources = array_merge(
-			$query['select'] ?? [],
+			$query['fields'] ?? [],
 			$query['group_by'] ?? [],
 			$query['order_by'] ?? [],
 			isset($query['where']) ? [$query['where']] : [],
@@ -79,9 +82,9 @@ class MysqlReportQueryCompiler implements IReportQueryCompiler
 			$tableMetaMap[$tableMeta->name] = $tableMeta;
 		}
 
-		foreach ($query['select'] as $entry) {
+		foreach ($query['fields'] as $entry) {
 			if (!isset($entry['element'])) {
-				throw new QueryValidationException("Missing element in select entry.");
+				throw new QueryValidationException("Missing element in fields entry.");
 			}
 
 			$element = $entry['element'];
@@ -168,7 +171,7 @@ class MysqlReportQueryCompiler implements IReportQueryCompiler
 
 	private function collectAliasUsage(array $query): void {
 		$nodes = array_merge(
-			$query['select'] ?? [],
+			$query['fields'] ?? [],
 			$query['group_by'] ?? [],
 			$query['order_by'] ?? [],
 			isset($query['where']) ? [$query['where']] : [],
