@@ -12,7 +12,7 @@ use DataHawk\Api\IReportQueryCompiler;
 use DataHawk\Api\IReportExporterFactory;
 use DataHawk\Service\DefaultReportQueryService;
 use DataHawk\Schema\DefaultReportSchemaProvider;
-use DataHawk\Compiler\ReportQueryCompiler;
+use DataHawk\Compiler\MysqlReportQueryCompiler;
 use DataHawk\Service\ReportExporterFactory;
 
 class DataHawkPlugin implements IPlugin {
@@ -40,7 +40,7 @@ class DataHawkPlugin implements IPlugin {
 
 			->set(
 				IReportQueryCompiler::class,
-				fn($c) => new ReportQueryCompiler(
+				fn($c) => new MysqlReportQueryCompiler(
 					$c->get(IReportSchemaProvider::class)),
 				IContainer::SHARED | IContainer::NOOVERWRITE)
 

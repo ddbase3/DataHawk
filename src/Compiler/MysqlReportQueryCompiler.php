@@ -8,7 +8,7 @@ use DataHawk\Exception\QueryValidationException;
 use DataHawk\Dto\SqlQuery;
 use DataHawk\Util\Graph;
 
-class ReportQueryCompiler implements IReportQueryCompiler
+class MysqlReportQueryCompiler implements IReportQueryCompiler
 {
 	private Graph $joinGraph;
 	private array $tableAliases = []; // alias => table
