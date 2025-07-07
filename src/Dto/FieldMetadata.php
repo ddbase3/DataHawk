@@ -10,7 +10,7 @@ class FieldMetadata
         public ?string $description = null,
         public bool $primaryKey = false,
         public ?ForeignKeyReference $foreignKey = null,
-        public bool $nullable = true,
+        public bool $nullable = false,
         public array $tags = [],
         public ?string $alias = null,
 	public bool $sensitive = false
