@@ -24,7 +24,8 @@ class ElementCompiler
         return match ($element['type']) {
             'fld'      => $this->compileField($element),
             'fn'       => $this->compileFunction($element),
-            'op'       => $this->compileOperation($element),
+            'windowfn' => $this->compileWindowFunction($element),
+	    'op'       => $this->compileOperation($element),
             'subquery' => $this->compileSubquery($element),
             default    => throw new QueryValidationException("Unsupported element type: " . $element['type'])
         };
@@ -84,11 +85,60 @@ class ElementCompiler
             return "CONVERT(" . $args[0] . " USING " . strtoupper(trim($fn['params'][1])) . ")";
         }
 
-        return $name . '(' . implode(', ', $args) . ')';
+	$sql = $name . '(';
+	if (!empty($fn['distinct'])) $sql .= 'DISTINCT ';
+	$sql .= implode(', ', $args) . ')';
+	return $sql;
     }
 
+private function compileWindowFunction(array $fn): string
+{
+    if (!isset($fn['function'], $fn['params'])) {
+        throw new QueryValidationException("Window function must have 'function' and 'params'.");
+    }
+
+    $name = strtoupper($fn['function']);
+    $args = array_map(fn($param) => $this->compileElement($param), $fn['params']);
+
+    // Basisfunktion (z. B. COUNT(*), SUM(field), etc.)
+    $sql = $name . '(' . implode(', ', $args) . ') OVER';
+
+    // Leeres OVER () als Standard (z. B. für COUNT(*) OVER ())
+    if (empty($fn['over'])) {
+        $sql .= ' ()';
+        return $sql;
+    }
+
+    // Optional: OVER-Klausel mit PARTITION BY, ORDER BY usw.
+    $over = $fn['over'];
+    $parts = [];
+
+    if (!empty($over['partition_by'])) {
+        $partitionFields = array_map(fn($e) => $this->compileElement($e), $over['partition_by']);
+        $parts[] = 'PARTITION BY ' . implode(', ', $partitionFields);
+    }
+
+    if (!empty($over['order_by'])) {
+        $orderFields = array_map(function ($e) {
+            if (!is_array($e) || !isset($e['expression'])) {
+                throw new QueryValidationException("Each ORDER BY entry must have an 'expression'.");
+            }
+            $expr = $this->compileElement($e['expression']);
+            $direction = strtoupper($e['direction'] ?? 'ASC');
+            if (!in_array($direction, ['ASC', 'DESC'])) {
+                throw new QueryValidationException("ORDER BY direction must be ASC or DESC.");
+            }
+            return $expr . ' ' . $direction;
+        }, $over['order_by']);
+        $parts[] = 'ORDER BY ' . implode(', ', $orderFields);
+    }
+
+    $sql .= ' (' . implode(' ', $parts) . ')';
+    return $sql;
+}
+
     private function compileOperation(array $op): string
-    {
+   {
         $opName = strtoupper($op['operator'] ?? '');
         $params = $op['params'] ?? [];
 
