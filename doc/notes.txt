@@ -97,7 +97,7 @@ Gesamt-Schema:
         "additionalProperties": false
       }
     },
-    "from": {
+    "table": {
       "type": "string",
       "description": "Main table to query from"
     },
@@ -157,7 +157,7 @@ Gesamt-Schema:
       "default": false
     }
   },
-  "required": ["select", "from"],
+  "required": ["select", "table"],
   "additionalProperties": false,
 
   "$defs": {
@@ -239,7 +239,8 @@ Gesamt-Schema:
 Beispielauszug (gültig laut Schema)
 
 {
-  "select": [
+  "type": "select",
+  "fields": [
     {
       "element": {
         "type": "fn",
@@ -249,7 +250,7 @@ Beispielauszug (gültig laut Schema)
       "alias": "order_count"
     }
   ],
-  "from": "users",
+  "table": "users",
   "where": {
     "type": "op",
     "operator": "AND",

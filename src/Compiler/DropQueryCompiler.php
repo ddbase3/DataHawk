@@ -1,0 +1,34 @@
+<?php declare(strict_types=1);
+
+namespace DataHawk\Compiler;
+
+use DataHawk\Api\IReportQueryTypeCompiler;
+use DataHawk\Api\IReportSchemaProvider;
+use DataHawk\Dto\SqlQuery;
+use DataHawk\Exception\QueryValidationException;
+
+/**
+ * Compiles 'drop' type queries into SQL.
+ */
+class DropQueryCompiler implements IReportQueryTypeCompiler {
+
+	private ElementCompiler $elementCompiler;
+
+	public function __construct(IReportSchemaProvider $schemaProvider) {
+		$aliasResolver = new AliasResolver();
+		$this->elementCompiler = new ElementCompiler($aliasResolver, $this);
+	}
+
+	public function compile(array $query): SqlQuery {
+		$table = $query['table'] ?? null;
+
+		if (!$table || !is_string($table)) {
+			throw new QueryValidationException("DROP query must define a valid 'table'.");
+		}
+
+		$sql = 'DROP TABLE ' . $this->elementCompiler->quoteIdentifier($table);
+
+		return new SqlQuery($sql, [], [], false);
+	}
+}
+

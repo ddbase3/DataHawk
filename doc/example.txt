@@ -1,5 +1,6 @@
 $query = [
-    "select" => [
+    "type" => "select",
+    "fields" => [
         [
             "element" => [ "type" => "fld", "table" => "packagist_package", "field" => "handle_id" ],
             "alias" => "handle"
@@ -25,7 +26,7 @@ $query = [
             "alias" => "max_dl"
         ]
     ],
-    "from" => "packagist_package",
+    "table" => "packagist_package",
     "where" => [
         "type" => "op",
         "operator" => "LIKE",
@@ -67,7 +68,8 @@ $query = [
 ];
 
 $query = [
-    "select" => [
+    "type" => "select",
+    "fields" => [
         [
             "element" => [
                 "type" => "fld",
@@ -87,12 +89,13 @@ $query = [
             "alias" => "second_vendor"
         ]
     ],
-    "from" => "packagist_package",
+    "table" => "packagist_package",
     "limit" => 5
 ];
 
 $query = [
-  "select" => [
+  "type" => "select",
+  "fields" => [
     [
       "element" => [
         "type" => "fld",
@@ -117,7 +120,7 @@ $query = [
               "alias" => "package_count"
             ]
           ],
-          "from" => "packagist_package",
+          "table" => "packagist_package",
           "where" => [
             "type" => "op",
             "operator" => "=",
@@ -131,7 +134,7 @@ $query = [
       "alias" => "package_count"
     ]
   ],
-  // "from" => "packagist_handle",
+  // "table" => "packagist_handle",
   "limit" => 10
 ];
 

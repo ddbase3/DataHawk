@@ -5,127 +5,135 @@ namespace DataHawk\Compiler;
 use DataHawk\Exception\QueryValidationException;
 use DataHawk\Util\Graph;
 
-class JoinPlanner
-{
-    private Graph $joinGraph;
+class JoinPlanner {
 
-    public function __construct(
-        private AliasResolver $aliasResolver,
-        private ElementCompiler $elementCompiler,
-        Graph $joinGraph
-    ) {
-        $this->joinGraph = $joinGraph;
-    }
+	private Graph $joinGraph;
 
-    /**
-     * Analysiert alle Elemente und extrahiert benötigte Tabellen (mit Variant)
-     */
-    public function collectJoinDependencies(array $nodes): array
-    {
-        $tables = [];
+	public function __construct(
+		private AliasResolver $aliasResolver,
+		private ElementCompiler $elementCompiler,
+		Graph $joinGraph
+	) {
+		$this->joinGraph = $joinGraph;
+	}
 
-        foreach ($nodes as $node) {
-            if (!is_array($node)) continue;
+	/**
+	 * Analysiert alle Elemente und extrahiert benötigte Tabellen (mit Variant)
+	 */
+	public function collectJoinDependencies(array $nodes): array {
+		$tables = [];
 
-            if (($node['type'] ?? null) === 'fld') {
-                $table = $node['table'];
-                $alias = $node['tablealias'] ?? $table;
-                $this->aliasResolver->registerAlias($alias, $table);
-                $tables[$table] = $node['variant'] ?? ($tables[$table] ?? null);
-	    }
+		foreach ($nodes as $node) {
+			if (!is_array($node)) continue;
 
-            if (isset($node['element'])) {
-                $tables = array_merge($tables, $this->collectJoinDependencies([$node['element']]));
-            }
+			// Direct field reference
+			if (($node['type'] ?? null) === 'fld') {
+				$table = $node['table'];
+				$alias = $node['tablealias'] ?? $table;
+				$this->aliasResolver->registerAlias($alias, $table);
+				if (!isset($tables[$table])) {
+					$tables[$table] = $node['variant'] ?? null;
+				}
+				continue; // No deeper scan needed
+			}
 
-            if (isset($node['params']) && is_array($node['params'])) {
-                $tables = array_merge($tables, $this->collectJoinDependencies($node['params']));
-            }
+			// Recursively scan known subkeys
+			foreach (['element', 'params', 'query', 'args', 'left', 'right'] as $key) {
+				if (!empty($node[$key])) {
+					$childNodes = is_array($node[$key])
+						? (self::isAssoc($node[$key]) ? [$node[$key]] : $node[$key])
+						: [];
 
-            if (isset($node['query']) && is_array($node['query'])) {
-                $tables = array_merge($tables, $this->collectJoinDependencies([$node['query']]));
-            }
-        }
+					$subTables = $this->collectJoinDependencies($childNodes);
 
-        return $tables;
-    }
+					foreach ($subTables as $tbl => $variant) {
+						if (!isset($tables[$tbl])) $tables[$tbl] = $variant;
+					}
+				}
+			}
+		}
 
-    /**
-     * Baut JOIN-SQL anhand der gescannten aliasUsage und resolveden Pfade
-     */
-    public function compileJoins(string $from, array $joinRequests): string
-    {
-        $sql = '';
-        $visited = [$from];
-        $aliasUsage = $this->aliasResolver->getAliasUsage();
+		return $tables;
+	}
 
-        foreach ($joinRequests as $target => $variant) {
-            if ($target === $from) continue;
+	private static function isAssoc(array $array): bool {
+		return array_keys($array) !== range(0, count($array) - 1);
+	}
 
-            $paths = $this->joinGraph->findAllPaths($from, $target);
-            if (empty($paths)) {
-                throw new QueryValidationException("No join path from '$from' to '$target'");
-            }
+	/**
+	 * Build JOIN-SQL based of scaned aliasUsage and resolved paths
+	 */
+	public function compileJoins(string $from, array $joinRequests): string {
+		$sql = '';
+		$visited = [$from];
+		$aliasUsage = $this->aliasResolver->getAliasUsage();
 
-            // Fallback: bevorzugt "default"-Pfad
-            $path = null;
-            foreach ($paths as $candidate) {
-                if (!empty($candidate[0]['meta']['default'])) {
-                    $path = $candidate;
-                    break;
-                }
-            }
-            if (!$path) $path = $paths[0];
+		foreach ($joinRequests as $target => $variant) {
+			if ($target === $from) continue;
 
-            $lastStep = $path[array_key_last($path)];
+			$paths = $this->joinGraph->findAllPaths($from, $target);
+			if (empty($paths)) {
+				throw new QueryValidationException("No join path from '$from' to '$target'");
+			}
 
-            foreach ($path as $step) {
-                $table = $step['to'];
-                $aliases = array_keys($aliasUsage[$table] ?? [$table => true]);
+			// Fallback: bevorzugt "default"-Pfad
+			$path = null;
+			foreach ($paths as $candidate) {
+				if (!empty($candidate[0]['meta']['default'])) {
+					$path = $candidate;
+					break;
+				}
+			}
+			if (!$path) $path = $paths[0];
 
-                foreach ($aliases as $alias) {
-                    $alreadyJoined = "{$table}::{$alias}";
-                    static $joined = [];
+			$lastStep = $path[array_key_last($path)];
 
-                    if (isset($joined[$alreadyJoined])) continue;
-                    $joined[$alreadyJoined] = true;
+			foreach ($path as $step) {
+				$table = $step['to'];
+				$aliases = array_keys($aliasUsage[$table] ?? [$table => true]);
 
-                    $this->aliasResolver->registerAlias($alias, $table);
+				foreach ($aliases as $alias) {
+					$alreadyJoined = "{$table}::{$alias}";
+					$joined = [];
 
-                    $isDefault = $step['meta']['default'] ?? false;
-                    $stepType = strtoupper($step['meta']['type'] ?? 'INNER');
-                    $isLastStep = ($step === $lastStep);
+					if (isset($joined[$alreadyJoined])) continue;
+					$joined[$alreadyJoined] = true;
 
-                    $useLeft = ($isLastStep && $variant && strtoupper($variant) === 'OPTIONAL')
-                            || ($isLastStep && !$variant && $isDefault && $stepType === 'LEFT');
+					$this->aliasResolver->registerAlias($alias, $table);
 
-                    $joinType = $useLeft ? 'LEFT JOIN' : 'INNER JOIN';
+					$isDefault = $step['meta']['default'] ?? false;
+					$stepType = strtoupper($step['meta']['type'] ?? 'INNER');
+					$isLastStep = ($step === $lastStep);
 
-                    $onParts = [];
-                    foreach ($step['meta']['on'] as $left => $right) {
-                        $onParts[] = $this->quoteJoinField($left) . ' = ' . $this->quoteJoinField($right, $alias);
-                    }
+					$useLeft = ($isLastStep && $variant && strtoupper($variant) === 'OPTIONAL')
+						|| ($isLastStep && !$variant && $isDefault && $stepType === 'LEFT');
 
-                    $sql .= " $joinType " . $this->elementCompiler->quoteIdentifier($table);
-                    if ($alias !== $table) {
-                        $sql .= " AS " . $this->elementCompiler->quoteIdentifier($alias);
-                    }
-                    $sql .= " ON " . implode(" AND ", $onParts);
-                }
-            }
-        }
+					$joinType = $useLeft ? 'LEFT JOIN' : 'INNER JOIN';
 
-        return $sql;
-    }
+					$onParts = [];
+					foreach ($step['meta']['on'] as $left => $right) {
+						$onParts[] = $this->quoteJoinField($left) . ' = ' . $this->quoteJoinField($right, $alias);
+					}
 
-    private function quoteJoinField(string $str, ?string $aliasOverride = null): string
-    {
-        if (str_contains($str, '.')) {
-            [$table, $field] = explode('.', $str, 2);
-            $alias = $aliasOverride ?? $this->aliasResolver->getAliasForTable($table) ?? $table;
-            return $this->elementCompiler->quoteIdentifier($alias) . '.' . $this->elementCompiler->quoteIdentifier($field);
-        }
-        return $this->elementCompiler->quoteIdentifier($aliasOverride ?? $str);
-    }
+					$sql .= " $joinType " . $this->elementCompiler->quoteIdentifier($table);
+					if ($alias !== $table) {
+						$sql .= " AS " . $this->elementCompiler->quoteIdentifier($alias);
+					}
+					$sql .= " ON " . implode(" AND ", $onParts);
+				}
+			}
+		}
+
+		return $sql;
+	}
+
+	private function quoteJoinField(string $str, ?string $aliasOverride = null): string {
+		if (str_contains($str, '.')) {
+			[$table, $field] = explode('.', $str, 2);
+			$alias = $aliasOverride ?? $this->aliasResolver->getAliasForTable($table) ?? $table;
+			return $this->elementCompiler->quoteIdentifier($alias) . '.' . $this->elementCompiler->quoteIdentifier($field);
+		}
+		return $this->elementCompiler->quoteIdentifier($aliasOverride ?? $str);
+	}
 }
 

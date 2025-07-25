@@ -4,185 +4,188 @@ namespace DataHawk\Compiler;
 
 use DataHawk\Exception\QueryValidationException;
 
-class ElementCompiler
-{
-    public function __construct(
-        private AliasResolver $aliasResolver,
-        private MysqlReportQueryCompiler $compiler // rekursiver Zugriff für Subqueries
-    ) {}
+class ElementCompiler {
 
-    public function compileElement(mixed $element): string
-    {
-        if (is_string($element) || is_numeric($element) || is_bool($element) || is_null($element)) {
-            return $this->quoteLiteral($element);
-        }
+	public function __construct(
+		private AliasResolver $aliasResolver,
+		private object $compiler  // recursive access for subqueries
+	) {}
 
-        if (!is_array($element) || !isset($element['type'])) {
-            throw new QueryValidationException("Invalid element structure: " . print_r($element, true));
-        }
+	public function compileElement(mixed $element): string {
+		if (is_string($element) || is_numeric($element) || is_bool($element) || is_null($element)) {
+			return $this->quoteLiteral($element);
+		}
 
-        return match ($element['type']) {
-            'fld'      => $this->compileField($element),
-            'fn'       => $this->compileFunction($element),
-            'windowfn' => $this->compileWindowFunction($element),
-	    'op'       => $this->compileOperation($element),
-            'subquery' => $this->compileSubquery($element),
-            default    => throw new QueryValidationException("Unsupported element type: " . $element['type'])
-        };
-    }
+		if (!is_array($element) || !isset($element['type'])) {
+			throw new QueryValidationException("Invalid element structure: " . print_r($element, true));
+		}
 
-    private function compileField(array $fld): string
-    {
-        $alias = $fld['tablealias'] ?? $this->aliasResolver->getAliasForTable($fld['table']) ?? $fld['table'];
-        return $this->quoteIdentifier($alias) . '.' . $this->quoteIdentifier($fld['field']);
-    }
+		return match ($element['type']) {
+			'fld'      => $this->compileField($element),
+			'fn'       => $this->compileFunction($element),
+			'windowfn' => $this->compileWindowFunction($element),
+			'op'       => $this->compileOperation($element),
+			'subquery' => $this->compileSubquery($element),
+			default    => throw new QueryValidationException("Unsupported element type: " . $element['type'])
+		};
+	}
 
-    private function compileFunction(array $fn): string
-    {
-        if (!isset($fn['function'], $fn['params'])) {
-            throw new QueryValidationException("Function must have 'function' and 'params'.");
-        }
+	private function compileField(array $fld): string {
+		$fieldName = $fld['field'] ?? null;
+		if (!$fieldName) {
+			throw new QueryValidationException("Field reference must contain a 'field' key.");
+		}
 
-        $name = strtoupper($fn['function']);
-        $args = array_map(fn($param) => $this->compileElement($param), $fn['params']);
+		// Table is optional in UNION context or subqueries
+		$table = $fld['table'] ?? null;
+		if (!$table) {
+			return $this->quoteIdentifier($fieldName);
+		}
 
-        if ($name === 'GROUP_CONCAT') {
-            if (count($args) === 0 || count($args) > 2) {
-                throw new QueryValidationException("GROUP_CONCAT expects 1 or 2 parameters.");
-            }
+		$alias = $fld['tablealias'] ?? $this->aliasResolver->getAliasForTable($table) ?? $table;
+		return $this->quoteIdentifier($alias) . '.' . $this->quoteIdentifier($fieldName);
+	}
 
-            $sql = 'GROUP_CONCAT(';
+	private function compileFunction(array $fn): string {
+		if (!isset($fn['function'], $fn['params'])) {
+			throw new QueryValidationException("Function must have 'function' and 'params'.");
+		}
 
-            if (!empty($fn['distinct'])) {
-                $sql .= 'DISTINCT ';
-            }
+		$name = strtoupper($fn['function']);
+		$args = array_map(fn($param) => $this->compileElement($param), $fn['params']);
 
-            $sql .= $args[0];
+		if ($name === 'GROUP_CONCAT') {
+			if (count($args) === 0 || count($args) > 2) {
+				throw new QueryValidationException("GROUP_CONCAT expects 1 or 2 parameters.");
+			}
 
-            if (!empty($fn['params'][1])) {
-                $sepLiteral = $fn['params'][1];
-                if (!is_string($sepLiteral)) {
-                    throw new QueryValidationException("GROUP_CONCAT separator must be a string literal.");
-                }
-                $sql .= ' SEPARATOR ' . $this->quoteLiteral($sepLiteral);
-            }
+			$sql = 'GROUP_CONCAT(';
 
-            $sql .= ')';
-            return $sql;
-        }
+			if (!empty($fn['distinct'])) {
+				$sql .= 'DISTINCT ';
+			}
 
-        if ($name === 'CAST') {
-            if (count($args) !== 2 || !is_string($fn['params'][1])) {
-                throw new QueryValidationException("CAST expects 2 parameters: value and type string.");
-            }
-            return "CAST(" . $args[0] . " AS " . strtoupper(trim($fn['params'][1])) . ")";
-        }
+			$sql .= $args[0];
 
-        if ($name === 'CONVERT') {
-            if (count($args) !== 2 || !is_string($fn['params'][1])) {
-                throw new QueryValidationException("CONVERT expects 2 parameters: value and charset string.");
-            }
-            return "CONVERT(" . $args[0] . " USING " . strtoupper(trim($fn['params'][1])) . ")";
-        }
+			if (!empty($fn['params'][1])) {
+				$sepLiteral = $fn['params'][1];
+				if (!is_string($sepLiteral)) {
+					throw new QueryValidationException("GROUP_CONCAT separator must be a string literal.");
+				}
+				$sql .= ' SEPARATOR ' . $this->quoteLiteral($sepLiteral);
+			}
 
-	$sql = $name . '(';
-	if (!empty($fn['distinct'])) $sql .= 'DISTINCT ';
-	$sql .= implode(', ', $args) . ')';
-	return $sql;
-    }
+			$sql .= ')';
+			return $sql;
+		}
 
-private function compileWindowFunction(array $fn): string
-{
-    if (!isset($fn['function'], $fn['params'])) {
-        throw new QueryValidationException("Window function must have 'function' and 'params'.");
-    }
+		if ($name === 'CAST') {
+			if (count($args) !== 2 || !is_string($fn['params'][1])) {
+				throw new QueryValidationException("CAST expects 2 parameters: value and type string.");
+			}
+			return "CAST(" . $args[0] . " AS " . strtoupper(trim($fn['params'][1])) . ")";
+		}
 
-    $name = strtoupper($fn['function']);
-    $args = array_map(fn($param) => $this->compileElement($param), $fn['params']);
+		if ($name === 'CONVERT') {
+			if (count($args) !== 2 || !is_string($fn['params'][1])) {
+				throw new QueryValidationException("CONVERT expects 2 parameters: value and charset string.");
+			}
+			return "CONVERT(" . $args[0] . " USING " . strtoupper(trim($fn['params'][1])) . ")";
+		}
 
-    // Basisfunktion (z. B. COUNT(*), SUM(field), etc.)
-    $sql = $name . '(' . implode(', ', $args) . ') OVER';
+		$sql = $name . '(';
+		if (!empty($fn['distinct'])) $sql .= 'DISTINCT ';
+		$sql .= implode(', ', $args) . ')';
+		return $sql;
+	}
 
-    // Leeres OVER () als Standard (z. B. für COUNT(*) OVER ())
-    if (empty($fn['over'])) {
-        $sql .= ' ()';
-        return $sql;
-    }
+	private function compileWindowFunction(array $fn): string {
+		if (!isset($fn['function'], $fn['params'])) {
+			throw new QueryValidationException("Window function must have 'function' and 'params'.");
+		}
 
-    // Optional: OVER-Klausel mit PARTITION BY, ORDER BY usw.
-    $over = $fn['over'];
-    $parts = [];
+		$name = strtoupper($fn['function']);
+		$args = array_map(fn($param) => $this->compileElement($param), $fn['params']);
 
-    if (!empty($over['partition_by'])) {
-        $partitionFields = array_map(fn($e) => $this->compileElement($e), $over['partition_by']);
-        $parts[] = 'PARTITION BY ' . implode(', ', $partitionFields);
-    }
+		// Basisfunktion (z. B. COUNT(*), SUM(field), etc.)
+		$sql = $name . '(' . implode(', ', $args) . ') OVER';
 
-    if (!empty($over['order_by'])) {
-        $orderFields = array_map(function ($e) {
-            if (!is_array($e) || !isset($e['expression'])) {
-                throw new QueryValidationException("Each ORDER BY entry must have an 'expression'.");
-            }
-            $expr = $this->compileElement($e['expression']);
-            $direction = strtoupper($e['direction'] ?? 'ASC');
-            if (!in_array($direction, ['ASC', 'DESC'])) {
-                throw new QueryValidationException("ORDER BY direction must be ASC or DESC.");
-            }
-            return $expr . ' ' . $direction;
-        }, $over['order_by']);
-        $parts[] = 'ORDER BY ' . implode(', ', $orderFields);
-    }
+		// Leeres OVER () als Standard (z. B. für COUNT(*) OVER ())
+		if (empty($fn['over'])) {
+			$sql .= ' ()';
+			return $sql;
+		}
 
-    $sql .= ' (' . implode(' ', $parts) . ')';
-    return $sql;
-}
+		// Optional: OVER-Klausel mit PARTITION BY, ORDER BY usw.
+		$over = $fn['over'];
+		$parts = [];
 
-    private function compileOperation(array $op): string
-   {
-        $opName = strtoupper($op['operator'] ?? '');
-        $params = $op['params'] ?? [];
+		if (!empty($over['partition_by'])) {
+			$partitionFields = array_map(fn($e) => $this->compileElement($e), $over['partition_by']);
+			$parts[] = 'PARTITION BY ' . implode(', ', $partitionFields);
+		}
 
-        return match ($opName) {
-            'IS NULL', 'IS NOT NULL' =>
-                $this->compileElement($params[0]) . ' ' . $opName,
+		if (!empty($over['order_by'])) {
+			$orderFields = array_map(function ($e) {
+				if (!is_array($e) || !isset($e['expression'])) {
+					throw new QueryValidationException("Each ORDER BY entry must have an 'expression'.");
+				}
+				$expr = $this->compileElement($e['expression']);
+				$direction = strtoupper($e['direction'] ?? 'ASC');
+				if (!in_array($direction, ['ASC', 'DESC'])) {
+					throw new QueryValidationException("ORDER BY direction must be ASC or DESC.");
+				}
+				return $expr . ' ' . $direction;
+			}, $over['order_by']);
+			$parts[] = 'ORDER BY ' . implode(', ', $orderFields);
+		}
 
-            'BETWEEN' =>
-                $this->compileElement($params[0]) . ' BETWEEN ' .
-                $this->compileElement($params[1]) . ' AND ' .
-                $this->compileElement($params[2]),
+		$sql .= ' (' . implode(' ', $parts) . ')';
+		return $sql;
+	}
 
-            'IN', 'NOT IN' =>
-                $this->compileElement($params[0]) . ' ' . $opName . ' (' .
-                implode(', ', array_map(fn($p) => $this->compileElement($p), array_slice($params, 1))) . ')',
+	private function compileOperation(array $op): string {
+		$opName = strtoupper($op['operator'] ?? '');
+		$params = $op['params'] ?? [];
 
-            'EXISTS', 'NOT EXISTS' =>
-                $opName . ' (' . $this->compileElement($params[0]) . ')',
+		return match ($opName) {
+			'IS NULL', 'IS NOT NULL' =>
+				$this->compileElement($params[0]) . ' ' . $opName,
 
-            default =>
-                '(' . implode(' ' . $op['operator'] . ' ', array_map(fn($p) => $this->compileElement($p), $params)) . ')'
-        };
-    }
+			'BETWEEN' =>
+				$this->compileElement($params[0]) . ' BETWEEN ' .
+				$this->compileElement($params[1]) . ' AND ' .
+				$this->compileElement($params[2]),
 
-    private function compileSubquery(array $sub): string
-    {
-        if (!isset($sub['query'])) {
-            throw new QueryValidationException("Subquery must have 'query'.");
-        }
+			'IN', 'NOT IN' =>
+				$this->compileElement($params[0]) . ' ' . $opName . ' (' .
+				implode(', ', array_map(fn($p) => $this->compileElement($p), array_slice($params, 1))) . ')',
 
-        $compiled = $this->compiler->compile($sub['query']);
-        return '(' . $compiled->sql . ')';
-    }
+			'EXISTS', 'NOT EXISTS' =>
+				$opName . ' (' . $this->compileElement($params[0]) . ')',
 
-    public function quoteIdentifier(string $str): string
-    {
-        return '`' . str_replace('`', '``', $str) . '`';
-    }
+			default =>
+				'(' . implode(' ' . $op['operator'] . ' ', array_map(fn($p) => $this->compileElement($p), $params)) . ')'
+		};
+	}
 
-    public function quoteLiteral(string|int|float|bool|null $value): string
-    {
-        if (is_null($value)) return 'NULL';
-        if (is_bool($value)) return $value ? 'TRUE' : 'FALSE';
-        return is_numeric($value) ? (string)$value : "'" . str_replace("'", "''", (string)$value) . "'";
-    }
+	private function compileSubquery(array $sub): string {
+		if (!isset($sub['query'])) {
+			throw new QueryValidationException("Subquery must have 'query'.");
+		}
+
+		$compiled = $this->compiler->compile($sub['query']);
+		return '(' . $compiled->sql . ')';
+	}
+
+	public function quoteIdentifier(string $str): string {
+		return '`' . str_replace('`', '``', $str) . '`';
+	}
+
+	public function quoteLiteral(string|int|float|bool|null $value): string {
+		if (is_null($value)) return 'NULL';
+		if (is_bool($value)) return $value ? 'TRUE' : 'FALSE';
+		return is_numeric($value) ? (string)$value : "'" . str_replace("'", "''", (string)$value) . "'";
+	}
 }
 

@@ -2,90 +2,82 @@
 
 namespace DataHawk\Compiler;
 
-class AliasResolver
-{
-    private array $tableAliases = [];   // alias => table
-    private array $aliasUsage = [];     // table => alias[]
-    private ?string $firstTableUsed = null;
+class AliasResolver {
 
-    public function reset(): void
-    {
-        $this->tableAliases = [];
-        $this->aliasUsage = [];
-        $this->firstTableUsed = null;
-    }
+	private array $tableAliases = [];   // alias => table
+	private array $aliasUsage = [];     // table => alias[]
+	private ?string $firstTableUsed = null;
 
-    public function scan(array $query): void
-    {
-        $this->reset();
+	public function reset(): void {
+		$this->tableAliases = [];
+		$this->aliasUsage = [];
+		$this->firstTableUsed = null;
+	}
 
-        $nodes = array_merge(
-            $query['fields'] ?? [],
-            $query['group_by'] ?? [],
-            $query['order_by'] ?? [],
-            isset($query['where']) ? [$query['where']] : [],
-            isset($query['having']) ? [$query['having']] : []
-        );
+	public function scan(array $query): void {
+		$this->reset();
 
-        foreach ($nodes as $node) {
-            $this->scanNode($node);
-        }
-    }
+		$nodes = array_merge(
+			$query['fields'] ?? [],
+			$query['group_by'] ?? [],
+			$query['order_by'] ?? [],
+			isset($query['where']) ? [$query['where']] : [],
+			isset($query['having']) ? [$query['having']] : []
+		);
 
-    private function scanNode(mixed $node): void
-    {
-        if (!is_array($node)) return;
+		foreach ($nodes as $node) {
+			$this->scanNode($node);
+		}
+	}
 
-        if (($node['type'] ?? null) === 'fld') {
-            $table = $node['table'] ?? null;
-            if (!$table) return;
-            $alias = $node['tablealias'] ?? $table;
+	private function scanNode(mixed $node): void {
+		if (!is_array($node)) return;
 
-            $this->aliasUsage[$table][$alias] = true;
+		if (($node['type'] ?? null) === 'fld') {
+			$table = $node['table'] ?? null;
+			if (!$table) return;
+			$alias = $node['tablealias'] ?? $table;
 
-            if ($this->firstTableUsed === null) {
-                $this->firstTableUsed = $table;
-            }
-        }
+			$this->aliasUsage[$table][$alias] = true;
 
-        foreach ($node as $child) {
-            if (is_array($child)) {
-                $this->scanNode($child);
-            }
-        }
-    }
+			if ($this->firstTableUsed === null) {
+				$this->firstTableUsed = $table;
+			}
+		}
 
-    public function getAliasUsage(): array
-    {
-        return $this->aliasUsage;
-    }
+		foreach ($node as $child) {
+			if (is_array($child)) {
+				$this->scanNode($child);
+			}
+		}
+	}
 
-    public function getFirstUsedTable(): ?string
-    {
-        return $this->firstTableUsed;
-    }
+	public function getAliasUsage(): array {
+		return $this->aliasUsage;
+	}
 
-    public function registerAlias(string $alias, string $table): void
-    {
-        $this->tableAliases[$alias] = $table;
-    }
+	public function getFirstUsedTable(): ?string {
+		return $this->firstTableUsed;
+	}
 
-    public function getAliasForTable(string $table): ?string
-    {
-        foreach ($this->tableAliases as $alias => $mappedTable) {
-            if ($mappedTable === $table) return $alias;
-        }
-        return null;
-    }
+	public function registerAlias(string $alias, string $table): void {
+		$this->tableAliases[$alias] = $table;
+		$this->aliasUsage[$table][$alias] = true;
+	}
 
-    public function getTableForAlias(string $alias): ?string
-    {
-        return $this->tableAliases[$alias] ?? null;
-    }
+	public function getAliasForTable(string $table): ?string {
+		foreach ($this->tableAliases as $alias => $mappedTable) {
+			if ($mappedTable === $table) return $alias;
+		}
+		return null;
+	}
 
-    public function getRegisteredAliases(): array
-    {
-        return $this->tableAliases;
-    }
+	public function getTableForAlias(string $alias): ?string {
+		return $this->tableAliases[$alias] ?? null;
+	}
+
+	public function getRegisteredAliases(): array {
+		return $this->tableAliases;
+	}
 }
 
