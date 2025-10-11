@@ -19,7 +19,14 @@ class ElementCompiler {
 		if (is_array($element) && !isset($element['type'])) {
 			if (array_keys($element) === range(0, count($element) - 1)) {
 				$compiled = array_map(fn($e) => $this->compileElement($e), $element);
-				return '(' . implode(', ', $compiled) . ')';
+
+				// Detect if any structured element is present (field, fn, op, etc.)
+				$hasStructured = array_reduce($element, fn($carry, $e) => $carry || (is_array($e) && isset($e['type'])), false);
+
+				// Only wrap in parentheses if needed
+				return $hasStructured
+					? '(' . implode(', ', $compiled) . ')'
+					: implode(', ', $compiled);
 			}
 			throw new QueryValidationException("Invalid array element structure: " . print_r($element, true));
 		}
