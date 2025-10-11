@@ -16,6 +16,14 @@ class ElementCompiler {
 			return $this->quoteLiteral($element);
 		}
 
+		if (is_array($element) && !isset($element['type'])) {
+			if (array_keys($element) === range(0, count($element) - 1)) {
+				$compiled = array_map(fn($e) => $this->compileElement($e), $element);
+				return '(' . implode(', ', $compiled) . ')';
+			}
+			throw new QueryValidationException("Invalid array element structure: " . print_r($element, true));
+		}
+
 		if (!is_array($element) || !isset($element['type'])) {
 			throw new QueryValidationException("Invalid element structure: " . print_r($element, true));
 		}
