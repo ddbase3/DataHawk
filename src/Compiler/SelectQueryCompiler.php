@@ -68,6 +68,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		$selectParts = [];
 		$compiledFields = [];
 		$isSensitiveQuery = false;
+		$hasWildcard = false;
 
 		foreach ($query['fields'] as $entry) {
 			if (!isset($entry['element'])) {
@@ -78,6 +79,11 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			$fieldTable = $element['table'] ?? null;
 			$fieldName = $element['field'] ?? null;
 			$alias = $entry['alias'] ?? $element['alias'] ?? null;
+
+			$isWildcard = ($fieldName === '*');
+			if ($isWildcard) {
+				$hasWildcard = true;
+			}
 
 			$sqlExpr = !empty($entry['distinct']) && empty($query['distinct']) ? 'DISTINCT ' : '';
 			$sqlExpr .= $this->elementCompiler->compileElement($element);
@@ -104,6 +110,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 				'type'      => $element['type'] ?? null,
 				'distinct'  => !empty($entry['distinct']) || !empty($query['distinct']),
 				'sensitive' => $fieldSensitive,
+				'wildcard'  => $isWildcard
 			];
 
 			$selectParts[] = $sqlExpr;
@@ -150,7 +157,8 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			$sql .= ' OFFSET ' . (int)$query['offset'];
 		}
 
-		return new SqlQuery($sql, [], $compiledFields, $isSensitiveQuery);
+		// ✅ mark wildcard query mode in result
+		return new SqlQuery($sql, [], $compiledFields, $isSensitiveQuery, $hasWildcard);
 	}
 
 	private function compileUnion(array $query): SqlQuery {

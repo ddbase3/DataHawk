@@ -51,14 +51,16 @@ class ElementCompiler {
 			throw new QueryValidationException("Field reference must contain a 'field' key.");
 		}
 
+		$field = $fieldName === '*' ? '*' : $this->quoteIdentifier($fieldName);
+
 		// Table is optional in UNION context or subqueries
 		$table = $fld['table'] ?? null;
 		if (!$table) {
-			return $this->quoteIdentifier($fieldName);
+			return $field;
 		}
 
 		$alias = $fld['tablealias'] ?? $this->aliasResolver->getAliasForTable($table) ?? $table;
-		return $this->quoteIdentifier($alias) . '.' . $this->quoteIdentifier($fieldName);
+		return $this->quoteIdentifier($alias) . '.' . $field;
 	}
 
 	private function compileFunction(array $fn): string {

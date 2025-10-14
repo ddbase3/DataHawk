@@ -8,17 +8,19 @@ namespace DataHawk\Dto;
  */
 class SqlQuery {
 
-	 /**
-	 * @param string $sql            The compiled SQL statement.
-	 * @param array $params          Bound parameters for the SQL query.
-	 * @param array $fields          Metadata for selected fields (name, alias, table, etc.).
-	 * @param bool $sensitive        True if query touches sensitive data.
+	/**
+	 * @param string $sql              The compiled SQL statement.
+	 * @param array $params            Bound parameters for the SQL query.
+	 * @param array $fields            Metadata for selected fields (name, alias, table, etc.).
+	 * @param bool $sensitive          True if query touches sensitive data.
+	 * @param bool $isWildcardQuery    True if query includes wildcard fields (e.g. table.* or *).
 	 */
 	public function __construct(
 		public string $sql,
 		public array $params = [],
 		public array $fields = [],
-		public bool $sensitive = false
+		public bool $sensitive = false,
+		public bool $isWildcardQuery = false
 	) {}
 }
 
