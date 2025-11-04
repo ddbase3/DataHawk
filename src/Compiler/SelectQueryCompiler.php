@@ -22,6 +22,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		$this->aliasResolver = new AliasResolver();
 		$this->elementCompiler = new ElementCompiler($this->aliasResolver, $this);
 
+		// Build graph of all join relations between tables
 		$this->joinGraph = new Graph();
 		foreach ($schemaProvider->getSchema() as $table) {
 			$this->joinGraph->addNode($table->name);
@@ -50,16 +51,19 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			throw new QueryValidationException("Query must contain 'table' or at least one field reference with 'table'.");
 		}
 
+		// Collect all elements that may reference tables
 		$elementSources = array_merge(
 			$query['fields'] ?? [],
 			$query['group_by'] ?? [],
 			$query['order_by'] ?? [],
-			isset($query['where']) ? [$query['where']] : [],
-			isset($query['having']) ? [$query['having']] : []
+			isset($query['where']) ? $this->flattenElements($query['where']) : [],
+			isset($query['having']) ? $this->flattenElements($query['having']) : []
 		);
 
+		// Let JoinPlanner determine required joins
 		$joinRequests = $this->joinPlanner->collectJoinDependencies($elementSources);
 
+		// Build table metadata map
 		$tableMetaMap = [];
 		foreach ($this->schemaProvider->getSchema() as $tableMeta) {
 			$tableMetaMap[$tableMeta->name] = $tableMeta;
@@ -81,9 +85,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			$alias = $entry['alias'] ?? $element['alias'] ?? null;
 
 			$isWildcard = ($fieldName === '*');
-			if ($isWildcard) {
-				$hasWildcard = true;
-			}
+			if ($isWildcard) $hasWildcard = true;
 
 			$sqlExpr = !empty($entry['distinct']) && empty($query['distinct']) ? 'DISTINCT ' : '';
 			$sqlExpr .= $this->elementCompiler->compileElement($element);
@@ -116,6 +118,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			$selectParts[] = $sqlExpr;
 		}
 
+		// Build final SQL
 		$sql = 'SELECT ' . (!empty($query['distinct']) ? 'DISTINCT ' : '') . implode(', ', $selectParts);
 		$sql .= ' FROM ' . $this->elementCompiler->quoteIdentifier($table);
 		$sql .= $this->joinPlanner->compileJoins($table, $joinRequests);
@@ -157,7 +160,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			$sql .= ' OFFSET ' . (int)$query['offset'];
 		}
 
-		// ✅ mark wildcard query mode in result
+		// Return full compiled query including wildcard info
 		return new SqlQuery($sql, [], $compiledFields, $isSensitiveQuery, $hasWildcard);
 	}
 
@@ -198,6 +201,21 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		}
 
 		return new SqlQuery($sql, [], [], false);
+	}
+
+	/**
+	 * Recursively flatten nested WHERE / HAVING structures
+	 * so JoinPlanner can detect all used tables.
+	 */
+	private function flattenElements(mixed $element): array {
+		if (!is_array($element)) return [];
+		$result = [$element];
+		foreach ($element as $v) {
+			if (is_array($v)) {
+				$result = array_merge($result, $this->flattenElements($v));
+			}
+		}
+		return $result;
 	}
 }
 
