@@ -19,13 +19,13 @@ The **DataHawk** plugin extends the [BASE3](https://github.com/ddbase3/Base3Fram
 ### 🔒 Sensitivity and Data Protection
 
 * Fields and tables can be marked as `sensitive`
-* Query compilation detects sensitivity and marks `SqlQuery::$sensitive`
+* Query compilation detects sensitivity and marks `QueryStatement::$sensitive`
 * `QueryResult` includes per-column sensitivity flags
 * Future-proof for export filtering, masking, and audit policies
 
 ### ⚖️ Schema Management
 
-* Schema provided by `IReportSchemaProvider` implementation (default: `DefaultReportSchemaProvider`)
+* Schema provided by `IQuerySchemaProvider` implementation (default: `DefaultReportSchemaProvider`)
 * Loaded from JSON files via configurable data directory
 * Table metadata includes joins, tags, categories, domains, default filters
 

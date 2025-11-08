@@ -2,8 +2,8 @@
 
 namespace DataHawk\Compiler;
 
-use DataHawk\Exception\QueryValidationException;
 use DataHawk\Util\Graph;
+use ResourceFoundation\Exception\QueryValidationException;
 
 class JoinPlanner {
 

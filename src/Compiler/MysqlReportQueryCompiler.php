@@ -2,24 +2,24 @@
 
 namespace DataHawk\Compiler;
 
-use DataHawk\Api\IReportQueryCompiler;
 use DataHawk\Api\IReportQueryValidator;
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\SqlQuery;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Api\IQueryCompiler;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\QueryStatement;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Central coordinator for compiling structured report queries.
  *
  * Delegates validation and SQL generation to specialized components.
  */
-class MysqlReportQueryCompiler implements IReportQueryCompiler {
+class MysqlReportQueryCompiler implements IQueryCompiler {
 
 	private QueryValidatorFactory $validatorFactory;
 	private QueryCompilerFactory $compilerFactory;
 
-	public function __construct(private IReportSchemaProvider $schemaProvider) {
+	public function __construct(private IQuerySchemaProvider $schemaProvider) {
 		$this->validatorFactory = new QueryValidatorFactory();
 		$this->compilerFactory = new QueryCompilerFactory($schemaProvider, $this);
 	}
@@ -28,10 +28,10 @@ class MysqlReportQueryCompiler implements IReportQueryCompiler {
 	 * Compiles a structured query into a SQLQuery DTO.
 	 *
 	 * @param array $query Structured query input
-	 * @return SqlQuery
+	 * @return QueryStatement 
 	 * @throws QueryValidationException
 	 */
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		$type = $query['type'] ?? 'select';
 
 		$validator = $this->validatorFactory->getValidator($type);

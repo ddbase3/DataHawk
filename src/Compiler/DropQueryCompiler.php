@@ -3,9 +3,9 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\SqlQuery;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\QueryStatement;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Compiles 'drop' type queries into SQL.
@@ -14,12 +14,12 @@ class DropQueryCompiler implements IReportQueryTypeCompiler {
 
 	private ElementCompiler $elementCompiler;
 
-	public function __construct(IReportSchemaProvider $schemaProvider) {
+	public function __construct(IQuerySchemaProvider $schemaProvider) {
 		$aliasResolver = new AliasResolver();
 		$this->elementCompiler = new ElementCompiler($aliasResolver, $this);
 	}
 
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		$table = $query['table'] ?? null;
 
 		if (!$table || !is_string($table)) {
@@ -28,7 +28,6 @@ class DropQueryCompiler implements IReportQueryTypeCompiler {
 
 		$sql = 'DROP TABLE ' . $this->elementCompiler->quoteIdentifier($table);
 
-		return new SqlQuery($sql, [], [], false);
+		return new QueryStatement($sql, [], [], false);
 	}
 }
-

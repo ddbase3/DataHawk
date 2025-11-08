@@ -3,7 +3,7 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryValidator;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Validator for ALTER TABLE queries.

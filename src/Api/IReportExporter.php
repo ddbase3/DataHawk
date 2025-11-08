@@ -3,7 +3,7 @@
 namespace DataHawk\Api;
 
 use Base3\Api\IBase;
-use DataHawk\Dto\QueryResult;
+use ResourceFoundation\Dto\QueryResult;
 
 interface IReportExporter extends IBase {
 

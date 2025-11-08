@@ -2,7 +2,7 @@
 
 namespace DataHawk\Compiler;
 
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Exception\QueryValidationException;
 
 class ElementCompiler {
 

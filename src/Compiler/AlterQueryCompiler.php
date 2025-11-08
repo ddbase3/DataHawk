@@ -3,14 +3,14 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Dto\SqlQuery;
+use ResourceFoundation\Dto\QueryStatement;
 
 /**
  * Compiles ALTER TABLE queries to SQL.
  */
 class AlterQueryCompiler implements IReportQueryTypeCompiler {
 
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		$table = $query['table'];
 		$actions = [];
 
@@ -65,7 +65,7 @@ class AlterQueryCompiler implements IReportQueryTypeCompiler {
 		}
 
 		$sql = 'ALTER TABLE ' . $this->quoteIdentifier($table) . "\n  " . implode(",\n  ", $actions);
-		return new SqlQuery($sql);
+		return new QueryStatement($sql);
 	}
 
 	private function quoteIdentifier(string $str): string {
@@ -78,4 +78,3 @@ class AlterQueryCompiler implements IReportQueryTypeCompiler {
 		return is_numeric($value) ? (string)$value : "'" . str_replace("'", "''", (string)$value) . "'";
 	}
 }
-

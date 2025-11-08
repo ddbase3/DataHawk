@@ -7,14 +7,14 @@ use Base3\Api\IClassMap;
 use Base3\Api\IContainer;
 use Base3\Api\IPlugin;
 use Base3\Configuration\Api\IConfiguration;
-use DataHawk\Api\IReportQueryService;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Api\IReportQueryCompiler;
 use DataHawk\Api\IReportExporterFactory;
 use DataHawk\Service\DefaultReportQueryService;
 use DataHawk\Schema\DefaultReportSchemaProvider;
 use DataHawk\Compiler\MysqlReportQueryCompiler;
 use DataHawk\Service\ReportExporterFactory;
+use ResourceFoundation\Api\IQueryCompiler;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Api\IQueryService;
 
 class DataHawkPlugin implements IPlugin, ICheck {
 
@@ -34,22 +34,22 @@ class DataHawkPlugin implements IPlugin, ICheck {
 			->set(self::getName(), $this, IContainer::SHARED)
 
 			->set(
-				IReportSchemaProvider::class,
+				IQuerySchemaProvider::class,
 				fn($c) => new DefaultReportSchemaProvider(
 					$c->get(IConfiguration::class)),
 				IContainer::SHARED | IContainer::NOOVERWRITE)
 
 			->set(
-				IReportQueryCompiler::class,
+				IQueryCompiler::class,
 				fn($c) => new MysqlReportQueryCompiler(
-					$c->get(IReportSchemaProvider::class)),
+					$c->get(IQuerySchemaProvider::class)),
 				IContainer::SHARED | IContainer::NOOVERWRITE)
 
 			->set(
-				IReportQueryService::class,
+				IQueryService::class,
 				fn($c) => new DefaultReportQueryService(
-					$c->get(IReportSchemaProvider::class),
-					$c->get(IReportQueryCompiler::class),
+					$c->get(IQuerySchemaProvider::class),
+					$c->get(IQueryCompiler::class),
 					$c),
 				IContainer::SHARED | IContainer::NOOVERWRITE)
 

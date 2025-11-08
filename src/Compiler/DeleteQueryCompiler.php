@@ -3,9 +3,9 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\SqlQuery;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\QueryStatement;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Compiles 'delete' type queries into SQL.
@@ -14,12 +14,12 @@ class DeleteQueryCompiler implements IReportQueryTypeCompiler {
 
 	private ElementCompiler $elementCompiler;
 
-	public function __construct(IReportSchemaProvider $schemaProvider) {
+	public function __construct(IQuerySchemaProvider $schemaProvider) {
 		$aliasResolver = new AliasResolver();
 		$this->elementCompiler = new ElementCompiler($aliasResolver, $this);
 	}
 
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		$table = $query['table'];
 
 		$sql = 'DELETE FROM ' . $this->elementCompiler->quoteIdentifier($table);
@@ -48,7 +48,6 @@ class DeleteQueryCompiler implements IReportQueryTypeCompiler {
 			$sql .= ' LIMIT ' . (int)$query['limit'];
 		}
 
-		return new SqlQuery($sql, [], [], false);
+		return new QueryStatement($sql, [], [], false);
 	}
 }
-

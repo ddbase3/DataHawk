@@ -3,9 +3,9 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\SqlQuery;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\QueryStatement;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Compiles 'create' type queries into SQL.
@@ -14,12 +14,12 @@ class CreateQueryCompiler implements IReportQueryTypeCompiler {
 
 	private ElementCompiler $elementCompiler;
 
-	public function __construct(IReportSchemaProvider $schemaProvider) {
+	public function __construct(IQuerySchemaProvider $schemaProvider) {
 		$aliasResolver = new AliasResolver();
 		$this->elementCompiler = new ElementCompiler($aliasResolver, $this);
 	}
 
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		$table = $query['table'];
 		$columns = $query['columns'];
 
@@ -64,7 +64,7 @@ class CreateQueryCompiler implements IReportQueryTypeCompiler {
 		$sql = 'CREATE TABLE ' . $this->elementCompiler->quoteIdentifier($table) .
 		       ' (' . implode(', ', $columnSql) . ')';
 
-		return new SqlQuery($sql, [], [], false);
+		return new QueryStatement($sql, [], [], false);
 	}
 
 	private function quoteLiteral(string $value): string {
@@ -73,4 +73,3 @@ class CreateQueryCompiler implements IReportQueryTypeCompiler {
 		return "'" . $escaped . "'";
 	}
 }
-

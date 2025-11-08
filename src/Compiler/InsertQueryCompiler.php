@@ -3,9 +3,9 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\SqlQuery;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\QueryStatement;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Compiles 'insert' type queries into SQL.
@@ -21,14 +21,14 @@ class InsertQueryCompiler implements IReportQueryTypeCompiler {
 	/** Used to compile 'from' subqueries (SELECT inside INSERT) */
 	private MysqlReportQueryCompiler $mainCompiler;
 
-	public function __construct(IReportSchemaProvider $schemaProvider, MysqlReportQueryCompiler $mainCompiler) {
+	public function __construct(IQuerySchemaProvider $schemaProvider, MysqlReportQueryCompiler $mainCompiler) {
 		$this->mainCompiler = $mainCompiler;
 
 		$aliasResolver = new AliasResolver();
 		$this->elementCompiler = new ElementCompiler($aliasResolver, $this);
 	}
 
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		$table = $query['table'];
 		$columns = $query['columns'] ?? null;
 
@@ -73,8 +73,8 @@ class InsertQueryCompiler implements IReportQueryTypeCompiler {
 			if (!is_array($query['from'])) {
 				throw new QueryValidationException("'from' must be a valid SELECT query structure.");
 			}
-			$selectSqlQuery = $this->mainCompiler->compile($query['from']);
-			$sql .= ' ' . $selectSqlQuery->sql;
+			$selectQueryStatement = $this->mainCompiler->compile($query['from']);
+			$sql .= ' ' . $selectQueryStatement->sql;
 		}
 
 		if (!empty($query['on_duplicate'])) {
@@ -89,7 +89,7 @@ class InsertQueryCompiler implements IReportQueryTypeCompiler {
 			$sql .= ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updateParts);
 		}
 
-		return new SqlQuery($sql, [], [], false);
+		return new QueryStatement($sql, [], [], false);
 	}
 
 	private function quoteValue(mixed $val): string {
@@ -105,4 +105,3 @@ class InsertQueryCompiler implements IReportQueryTypeCompiler {
 		return "'" . $escaped . "'";
 	}
 }
-

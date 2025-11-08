@@ -3,13 +3,13 @@
 namespace DataHawk\Schema;
 
 use Base3\Configuration\Api\IConfiguration;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\TableMetadata;
-use DataHawk\Dto\FieldMetadata;
-use DataHawk\Dto\JoinMetadata;
 use DataHawk\Dto\ForeignKeyReference;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\FieldMetadata;
+use ResourceFoundation\Dto\JoinMetadata;
+use ResourceFoundation\Dto\TableMetadata;
 
-class DefaultReportSchemaProvider implements IReportSchemaProvider {
+class DefaultReportSchemaProvider implements IQuerySchemaProvider {
 
 	private string $schemaDir;
 

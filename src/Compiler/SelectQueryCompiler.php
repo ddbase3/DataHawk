@@ -3,10 +3,10 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Dto\SqlQuery;
-use DataHawk\Exception\QueryValidationException;
-use DataHawk\Api\IReportSchemaProvider;
 use DataHawk\Util\Graph;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\QueryStatement;
+use ResourceFoundation\Exception\QueryValidationException;
 
 class SelectQueryCompiler implements IReportQueryTypeCompiler {
 
@@ -14,9 +14,9 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 	private AliasResolver $aliasResolver;
 	private JoinPlanner $joinPlanner;
 	private Graph $joinGraph;
-	private IReportSchemaProvider $schemaProvider;
+	private IQuerySchemaProvider $schemaProvider;
 
-	public function __construct(IReportSchemaProvider $schemaProvider) {
+	public function __construct(IQuerySchemaProvider $schemaProvider) {
 		$this->schemaProvider = $schemaProvider;
 
 		$this->aliasResolver = new AliasResolver();
@@ -38,7 +38,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		$this->joinPlanner = new JoinPlanner($this->aliasResolver, $this->elementCompiler, $this->joinGraph);
 	}
 
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		// ✨ UNION SUPPORT
 		if (isset($query['union'])) {
 			return $this->compileUnion($query);
@@ -161,10 +161,10 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		}
 
 		// Return full compiled query including wildcard info
-		return new SqlQuery($sql, [], $compiledFields, $isSensitiveQuery, $hasWildcard);
+		return new QueryStatement($sql, [], $compiledFields, $isSensitiveQuery, $hasWildcard);
 	}
 
-	private function compileUnion(array $query): SqlQuery {
+	private function compileUnion(array $query): QueryStatement {
 		$union = $query['union'];
 		$all = !($union['distinct'] ?? true); // false → UNION ALL
 
@@ -200,7 +200,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			$sql .= ' OFFSET ' . (int)$query['offset'];
 		}
 
-		return new SqlQuery($sql, [], [], false);
+		return new QueryStatement($sql, [], [], false);
 	}
 
 	/**
@@ -218,4 +218,3 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		return $result;
 	}
 }
-

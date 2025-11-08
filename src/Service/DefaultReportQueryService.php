@@ -4,21 +4,21 @@ namespace DataHawk\Service;
 
 use Base3\Api\IContainer;
 use Base3\Database\Api\IDatabase;
-use DataHawk\Api\IReportQueryService;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Api\IReportQueryCompiler;
-use DataHawk\Dto\TableMetadata;
-use DataHawk\Dto\QueryResult;
-use DataHawk\Exception\AccessDeniedException;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Api\IQueryCompiler;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Dto\QueryResult;
+use ResourceFoundation\Dto\TableMetadata;
+use ResourceFoundation\Exception\AccessDeniedException;
+use ResourceFoundation\Exception\QueryValidationException;
 
-class DefaultReportQueryService implements IReportQueryService {
+class DefaultReportQueryService implements IQueryService {
 
 	private IDatabase $database;
 
 	public function __construct(
-		private IReportSchemaProvider $schemaProvider,
-		private IReportQueryCompiler $querycompiler,
+		private IQuerySchemaProvider $schemaProvider,
+		private IQueryCompiler $querycompiler,
 		private IContainer $container
 	) {
 		$this->database = $container->get('database');

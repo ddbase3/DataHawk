@@ -3,14 +3,14 @@
 namespace DataHawk\Export;
 
 use DataHawk\Api\IReportExporter;
-use DataHawk\Api\IReportQueryService;
-use DataHawk\Dto\QueryResult;
+use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Dto\QueryResult;
 
 class BarChartReportExporter implements IReportExporter {
 
     private ?QueryResult $result = null;
 
-    public function __construct(private readonly IReportQueryService $reportqueryservice) {}
+    public function __construct(private readonly IQueryService $reportqueryservice) {}
 
     public static function getName(): string {
         return 'barchartreportexporter';

@@ -3,9 +3,9 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\SqlQuery;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\QueryStatement;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Compiles 'rename' type queries into SQL.
@@ -14,12 +14,12 @@ class RenameQueryCompiler implements IReportQueryTypeCompiler {
 
 	private ElementCompiler $elementCompiler;
 
-	public function __construct(IReportSchemaProvider $schemaProvider) {
+	public function __construct(IQuerySchemaProvider $schemaProvider) {
 		$aliasResolver = new AliasResolver();
 		$this->elementCompiler = new ElementCompiler($aliasResolver, $this);
 	}
 
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		$from = $query['tables']['from'] ?? null;
 		$to = $query['tables']['to'] ?? null;
 
@@ -36,7 +36,6 @@ class RenameQueryCompiler implements IReportQueryTypeCompiler {
 			' TO ' .
 			$this->elementCompiler->quoteIdentifier($to);
 
-		return new SqlQuery($sql, [], [], false);
+		return new QueryStatement($sql, [], [], false);
 	}
 }
-

@@ -19,7 +19,7 @@ interface IReportQueryValidator {
 	 *
 	 * @param array $query The query structure to validate
 	 *
-	 * @throws \DataHawk\Exception\QueryValidationException If validation fails
+	 * @throws \ResourceFoundation\Exception\QueryValidationException If validation fails
 	 */
 	public function validate(array $query): void;
 }

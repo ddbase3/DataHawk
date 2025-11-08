@@ -3,14 +3,14 @@
 namespace DataHawk\Export;
 
 use DataHawk\Api\IReportExporter;
-use DataHawk\Api\IReportQueryService;
-use DataHawk\Dto\QueryResult;
+use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Dto\QueryResult;
 
 class HtmlPageReportExporter implements IReportExporter {
 
 	private ?QueryResult $result = null;
 
-	public function __construct(private readonly IReportQueryService $reportqueryservice) {}
+	public function __construct(private readonly IQueryService $reportqueryservice) {}
 
 	// Required by IBase
 	public static function getName(): string {

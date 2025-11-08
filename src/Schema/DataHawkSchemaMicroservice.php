@@ -4,16 +4,16 @@ namespace DataHawk\Schema;
 
 use Base3\Microservice\Api\IMicroserviceConnector;
 use Base3\Microservice\AbstractMicroservice;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\TableMetadata;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\TableMetadata;
 
-class DataHawkSchemaMicroservice extends AbstractMicroservice implements IReportSchemaProvider {
+class DataHawkSchemaMicroservice extends AbstractMicroservice implements IQuerySchemaProvider {
 
 	public function __construct(
-		private readonly IReportSchemaProvider|IMicroserviceConnector $service
+		private readonly IQuerySchemaProvider|IMicroserviceConnector $service
 	) {}
 
-	// Implementation of IReportSchemaProvider
+	// Implementation of IQuerySchemaProvider
 
 	public function getSchema(): array {
 		return $this->service->getSchema();

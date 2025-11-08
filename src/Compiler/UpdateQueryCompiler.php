@@ -3,10 +3,10 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Dto\SqlQuery;
-use DataHawk\Exception\QueryValidationException;
 use DataHawk\Util\Graph;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Dto\QueryStatement;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Compiles 'update' type queries into SQL.
@@ -17,9 +17,9 @@ class UpdateQueryCompiler implements IReportQueryTypeCompiler {
 	private AliasResolver $aliasResolver;
 	private JoinPlanner $joinPlanner;
 	private Graph $joinGraph;
-	private IReportSchemaProvider $schemaProvider;
+	private IQuerySchemaProvider $schemaProvider;
 
-	public function __construct(IReportSchemaProvider $schemaProvider) {
+	public function __construct(IQuerySchemaProvider $schemaProvider) {
 		$this->schemaProvider = $schemaProvider;
 
 		$this->aliasResolver = new AliasResolver();
@@ -40,7 +40,7 @@ class UpdateQueryCompiler implements IReportQueryTypeCompiler {
 		$this->joinPlanner = new JoinPlanner($this->aliasResolver, $this->elementCompiler, $this->joinGraph);
 	}
 
-	public function compile(array $query): SqlQuery {
+	public function compile(array $query): QueryStatement {
 		$this->aliasResolver->scan($query);
 
 		$table = $query['table'] ?? null;
@@ -85,7 +85,6 @@ class UpdateQueryCompiler implements IReportQueryTypeCompiler {
 			$sql .= ' LIMIT ' . (int)$query['limit'];
 		}
 
-		return new SqlQuery($sql, [], [], false);
+		return new QueryStatement($sql, [], [], false);
 	}
 }
-

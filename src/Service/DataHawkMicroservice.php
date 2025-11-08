@@ -4,17 +4,17 @@ namespace DataHawk\Service;
 
 use Base3\Microservice\Api\IMicroserviceConnector;
 use Base3\Microservice\AbstractMicroservice;
-use DataHawk\Api\IReportQueryService;
-use DataHawk\Dto\TableMetadata;
-use DataHawk\Dto\QueryResult;
+use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Dto\QueryResult;
+use ResourceFoundation\Dto\TableMetadata;
 
-class DataHawkMicroservice extends AbstractMicroservice implements IReportQueryService {
+class DataHawkMicroservice extends AbstractMicroservice implements IQueryService {
 
 	public function __construct(
-		private readonly IReportQueryService|IMicroserviceConnector $service
+		private readonly IQueryService|IMicroserviceConnector $service
 	) {}
 
-	// Implementation of IReportQueryService
+	// Implementation of IQueryService
 
 	public function listTables(): array {
 		return $this->service->listTables();

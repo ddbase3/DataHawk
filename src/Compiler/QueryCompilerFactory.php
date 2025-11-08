@@ -3,8 +3,8 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Api\IReportSchemaProvider;
-use DataHawk\Exception\QueryValidationException;
+use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Factory for retrieving the appropriate query compiler instance
@@ -16,7 +16,7 @@ class QueryCompilerFactory {
 	private array $compilers = [];
 
 	public function __construct(
-		IReportSchemaProvider $schemaProvider,
+		IQuerySchemaProvider $schemaProvider,
 		MysqlReportQueryCompiler $mainCompiler
 	) {
 		$this->compilers = [
