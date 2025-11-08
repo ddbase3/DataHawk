@@ -2,6 +2,7 @@
 
 namespace DataHawk;
 
+use Base3\Api\ICheck;
 use Base3\Api\IClassMap;
 use Base3\Api\IContainer;
 use Base3\Api\IPlugin;
@@ -15,7 +16,7 @@ use DataHawk\Schema\DefaultReportSchemaProvider;
 use DataHawk\Compiler\MysqlReportQueryCompiler;
 use DataHawk\Service\ReportExporterFactory;
 
-class DataHawkPlugin implements IPlugin {
+class DataHawkPlugin implements IPlugin, ICheck {
 
 	public function __construct(private readonly IContainer $container) {}
 
@@ -56,5 +57,13 @@ class DataHawkPlugin implements IPlugin {
 				IReportExporterFactory::class,
 				fn($c) => new ReportExporterFactory($c->get(IClassMap::class)),
 				IContainer::SHARED | IContainer::NOOVERWRITE);
+	}
+
+	// Implementation of ICheck
+
+	public function checkDependencies() {
+		return array(
+			'resourcefoundationplugin_installed' => $this->container->get('resourcefoundationplugin') ? 'Ok' : 'resourcefoundationplugin not installed'
+		);
 	}
 }
