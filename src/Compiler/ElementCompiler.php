@@ -8,22 +8,23 @@ class ElementCompiler {
 
 	public function __construct(
 		private AliasResolver $aliasResolver,
-		private object $compiler  // recursive access for subqueries
+		private object $compiler	// recursive access for subqueries
 	) {}
 
 	public function compileElement(mixed $element): string {
+		// --- literals and scalars ---
 		if (is_string($element) || is_numeric($element) || is_bool($element) || is_null($element)) {
 			return $this->quoteLiteral($element);
 		}
 
+		// --- arrays without 'type' (list syntax) ---
 		if (is_array($element) && !isset($element['type'])) {
 			if (array_keys($element) === range(0, count($element) - 1)) {
 				$compiled = array_map(fn($e) => $this->compileElement($e), $element);
 
-				// Detect if any structured element is present (field, fn, op, etc.)
+				// Detect if structured element present (fld, fn, op, etc.)
 				$hasStructured = array_reduce($element, fn($carry, $e) => $carry || (is_array($e) && isset($e['type'])), false);
 
-				// Only wrap in parentheses if needed
 				return $hasStructured
 					? '(' . implode(', ', $compiled) . ')'
 					: implode(', ', $compiled);
@@ -41,6 +42,7 @@ class ElementCompiler {
 			'windowfn' => $this->compileWindowFunction($element),
 			'op'       => $this->compileOperation($element),
 			'subquery' => $this->compileSubquery($element),
+			'case'     => $this->compileCase($element),
 			default    => throw new QueryValidationException("Unsupported element type: " . $element['type'])
 		};
 	}
@@ -77,11 +79,7 @@ class ElementCompiler {
 			}
 
 			$sql = 'GROUP_CONCAT(';
-
-			if (!empty($fn['distinct'])) {
-				$sql .= 'DISTINCT ';
-			}
-
+			if (!empty($fn['distinct'])) $sql .= 'DISTINCT ';
 			$sql .= $args[0];
 
 			if (!empty($fn['params'][1])) {
@@ -124,16 +122,13 @@ class ElementCompiler {
 		$name = strtoupper($fn['function']);
 		$args = array_map(fn($param) => $this->compileElement($param), $fn['params']);
 
-		// Basisfunktion (z. B. COUNT(*), SUM(field), etc.)
 		$sql = $name . '(' . implode(', ', $args) . ') OVER';
 
-		// Leeres OVER () als Standard (z. B. für COUNT(*) OVER ())
 		if (empty($fn['over'])) {
 			$sql .= ' ()';
 			return $sql;
 		}
 
-		// Optional: OVER-Klausel mit PARTITION BY, ORDER BY usw.
 		$over = $fn['over'];
 		$parts = [];
 
@@ -190,9 +185,31 @@ class ElementCompiler {
 		if (!isset($sub['query'])) {
 			throw new QueryValidationException("Subquery must have 'query'.");
 		}
-
 		$compiled = $this->compiler->compile($sub['query']);
 		return '(' . $compiled->sql . ')';
+	}
+
+	private function compileCase(array $element): string {
+		$cases = $element['cases'] ?? null;
+		if (!$cases || !is_array($cases)) {
+			throw new QueryValidationException("CASE expression must have a 'cases' array.");
+		}
+
+		$sql = 'CASE';
+		foreach ($cases as $c) {
+			if (empty($c['when'])) {
+				throw new QueryValidationException("CASE entry missing 'when'.");
+			}
+			$when = $this->compileElement($c['when']);
+			$then = array_key_exists('then', $c) ? $this->compileElement($c['then']) : 'NULL';
+			$sql .= ' WHEN ' . $when . ' THEN ' . $then;
+		}
+
+		if (array_key_exists('else', $element)) {
+			$sql .= ' ELSE ' . $this->compileElement($element['else']);
+		}
+
+		return $sql . ' END';
 	}
 
 	public function quoteIdentifier(string $str): string {
@@ -202,7 +219,9 @@ class ElementCompiler {
 	public function quoteLiteral(string|int|float|bool|null $value): string {
 		if (is_null($value)) return 'NULL';
 		if (is_bool($value)) return $value ? 'TRUE' : 'FALSE';
-		return is_numeric($value) ? (string)$value : "'" . str_replace("'", "''", (string)$value) . "'";
+		return is_numeric($value)
+			? (string)$value
+			: "'" . str_replace("'", "''", (string)$value) . "'";
 	}
 }
 
