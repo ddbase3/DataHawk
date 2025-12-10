@@ -43,8 +43,8 @@ class DataTableReportExporter implements IReportExporter {
 		$html = '<div id="' . $uniqueid . '"></div>';
 		$html .= '<script>';
 		$html .= '(async () => {';
-		$html .= 'await AssetLoader.loadScriptAsync("plugin/ClientStack/assets/jquerydatatable/jquerydatatable.js");';
-		$html .= 'await AssetLoader.loadCssAsync("plugin/ClientStack/assets/jquerydatatable/jquerydatatable.css");';
+		$html .= 'await AssetLoader.loadScriptAsync("plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.js");';
+		$html .= 'await AssetLoader.loadCssAsync("plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.css");';
 		$html .= 'console.log("JqueryDataTable loaded");';
 		$html .= 'var data = ' . json_encode($this->result->rows) . ';';
 		$html .= 'var cols = ' . json_encode($cols) . ';';

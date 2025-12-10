@@ -42,6 +42,9 @@ class PieChartReportExporter implements IReportExporter {
 
 		$html = '<div style="height:300px;"><canvas id="' . $uniqueid . '"></canvas></div>';
 		$html .= '<script>';
+		$html .= '(async () => {';
+		$html .= 'await AssetLoader.loadScriptAsync("plugin/ClientStack/assets/chart/chart.js");';
+		$html .= 'console.log("Chart.js loaded");';
 		$html .= 'var result = ' . json_encode($this->result->rows) . ';';
 		$html .= 'var labels = []; var data = [];';
 		$html .= 'for (let i in result) { labels.push(result[i]["' . $col0 . '"]); data.push(result[i]["' . $col1 . '"]); }';
@@ -50,6 +53,7 @@ class PieChartReportExporter implements IReportExporter {
 		$html .= 'type: "doughnut", options: { responsive: true, maintainAspectRatio: false },';
 		$html .= 'data: { labels: labels, datasets: [{ label: "' . $col1 . '", data: data, hoverOffset: 4 }] }';
 		$html .= '});';
+		$html .= '})();';
 		$html .= '</script>';
 
 		return $html;
