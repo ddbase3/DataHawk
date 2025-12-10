@@ -56,8 +56,8 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			$query['fields'] ?? [],
 			$query['group_by'] ?? [],
 			$query['order_by'] ?? [],
-			isset($query['where']) ? $this->flattenElements($query['where']) : [],
-			isset($query['having']) ? $this->flattenElements($query['having']) : []
+			(!empty($query['where'])  ? $this->flattenElements($query['where'])  : []),
+			(!empty($query['having']) ? $this->flattenElements($query['having']) : [])
 		);
 
 		// Let JoinPlanner determine required joins
@@ -118,38 +118,61 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			$selectParts[] = $sqlExpr;
 		}
 
+		// No fields → invalid query
+		if (empty($selectParts)) {
+			throw new QueryValidationException("Query must contain at least one field in 'fields'.");
+		}
+
 		// Build final SQL
 		$sql = 'SELECT ' . (!empty($query['distinct']) ? 'DISTINCT ' : '') . implode(', ', $selectParts);
 		$sql .= ' FROM ' . $this->elementCompiler->quoteIdentifier($table);
 		$sql .= $this->joinPlanner->compileJoins($table, $joinRequests);
 
-		if (isset($query['where'])) {
-			$sql .= ' WHERE ' . $this->elementCompiler->compileElement($query['where']);
+		// WHERE (only if non-empty and compiles to non-empty SQL)
+		if (!empty($query['where'])) {
+			$whereSql = trim($this->elementCompiler->compileElement($query['where']));
+			if ($whereSql !== '') {
+				$sql .= ' WHERE ' . $whereSql;
+			}
 		}
 
-		if (isset($query['group_by']) && is_array($query['group_by'])) {
+		// GROUP BY (only if there are compiled expressions)
+		if (!empty($query['group_by']) && is_array($query['group_by'])) {
 			$groupParts = array_map(fn($el) => $this->elementCompiler->compileElement($el), $query['group_by']);
-			$sql .= ' GROUP BY ' . implode(', ', $groupParts);
+			$groupParts = array_values(array_filter(array_map('trim', $groupParts), fn($p) => $p !== ''));
+			if (!empty($groupParts)) {
+				$sql .= ' GROUP BY ' . implode(', ', $groupParts);
+			}
 		}
 
-		if (isset($query['having'])) {
-			$sql .= ' HAVING ' . $this->elementCompiler->compileElement($query['having']);
+		// HAVING (only if non-empty and compiles to non-empty SQL)
+		if (!empty($query['having'])) {
+			$havingSql = trim($this->elementCompiler->compileElement($query['having']));
+			if ($havingSql !== '') {
+				$sql .= ' HAVING ' . $havingSql;
+			}
 		}
 
-		if (isset($query['order_by']) && is_array($query['order_by'])) {
+		// ORDER BY (only if there are compiled expressions)
+		if (!empty($query['order_by']) && is_array($query['order_by'])) {
 			$orderParts = [];
 			foreach ($query['order_by'] as $order) {
 				if (!isset($order['element'])) {
 					throw new QueryValidationException("Missing element in order_by clause.");
 				}
-				$expr = $this->elementCompiler->compileElement($order['element']);
+				$expr = trim($this->elementCompiler->compileElement($order['element']));
+				if ($expr === '') {
+					continue;
+				}
 				$dir = strtoupper($order['direction'] ?? 'ASC');
 				if (!in_array($dir, ['ASC', 'DESC'])) {
 					throw new QueryValidationException("Invalid order direction: $dir");
 				}
 				$orderParts[] = $expr . ' ' . $dir;
 			}
-			$sql .= ' ORDER BY ' . implode(', ', $orderParts);
+			if (!empty($orderParts)) {
+				$sql .= ' ORDER BY ' . implode(', ', $orderParts);
+			}
 		}
 
 		if (isset($query['limit'])) {
@@ -176,20 +199,26 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 
 		$sql = implode($all ? ' UNION ALL ' : ' UNION ', $sqlParts);
 
-		if (isset($query['order_by']) && is_array($query['order_by'])) {
+		// ORDER BY for unions – also guard against empty/invalid parts
+		if (!empty($query['order_by']) && is_array($query['order_by'])) {
 			$orderParts = [];
 			foreach ($query['order_by'] as $order) {
 				if (!isset($order['element'])) {
 					throw new QueryValidationException("Missing element in order_by clause.");
 				}
-				$expr = $this->elementCompiler->compileElement($order['element']);
+				$expr = trim($this->elementCompiler->compileElement($order['element']));
+				if ($expr === '') {
+					continue;
+				}
 				$dir = strtoupper($order['direction'] ?? 'ASC');
 				if (!in_array($dir, ['ASC', 'DESC'])) {
 					throw new QueryValidationException("Invalid order direction: $dir");
 				}
 				$orderParts[] = $expr . ' ' . $dir;
 			}
-			$sql .= ' ORDER BY ' . implode(', ', $orderParts);
+			if (!empty($orderParts)) {
+				$sql .= ' ORDER BY ' . implode(', ', $orderParts);
+			}
 		}
 
 		if (isset($query['limit'])) {
