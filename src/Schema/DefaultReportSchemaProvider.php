@@ -3,9 +3,9 @@
 namespace DataHawk\Schema;
 
 use Base3\Configuration\Api\IConfiguration;
-use DataHawk\Dto\ForeignKeyReference;
 use ResourceFoundation\Api\IQuerySchemaProvider;
 use ResourceFoundation\Dto\FieldMetadata;
+use ResourceFoundation\Dto\ForeignKeyReference;
 use ResourceFoundation\Dto\JoinMetadata;
 use ResourceFoundation\Dto\TableMetadata;
 
