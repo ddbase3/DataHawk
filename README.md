@@ -270,5 +270,5 @@ This system uses a declarative, JSON-based query language to describe database o
 
 ## License
 
-LGPL. See BASE3 license for framework details.
+GPL 3.0. See BASE3 license for framework details.
 
