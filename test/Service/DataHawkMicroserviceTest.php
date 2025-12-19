@@ -11,93 +11,88 @@ use ResourceFoundation\Dto\TableMetadata;
 
 class DataHawkMicroserviceTest extends TestCase {
 
-        public function testDelegatesAllMethodsToUnderlyingService(): void {
-                $service = new FakeQueryServiceConnector();
+	public function testDelegatesAllMethodsToUnderlyingService(): void {
+		$service = new class implements IQueryService, IMicroserviceConnector {
 
-                $ms = new DataHawkMicroservice($service);
+			/** @var list<mixed> */
+			public array $calls = [];
 
-                $tables = $ms->listTables();
-                $this->assertSame(['tables'], $tables);
-                $this->assertSame(['listTables'], $service->calls);
+			public function getMicroserviceUrl() {
+				return 'http://fake';
+			}
 
-                $service->calls = [];
-                $table = $ms->getTable('users');
-                $this->assertInstanceOf(TableMetadata::class, $table);
-                $this->assertSame('users', $table->name);
-                $this->assertSame([['getTable', 'users']], $service->calls);
+			public function listTables(): array {
+				$this->calls[] = 'listTables';
+				return ['tables'];
+			}
 
-                $service->calls = [];
-                $result = $ms->executeQuery(['q' => 1]);
-                $this->assertInstanceOf(QueryResult::class, $result);
-                $this->assertSame([['executeQuery', ['q' => 1]]], $service->calls);
+			public function getTable(string $tableName): ?TableMetadata {
+				$this->calls[] = ['getTable', $tableName];
+				return new TableMetadata(
+					name: $tableName,
+					label: null,
+					description: null,
+					domain: 'd',
+					category: 'c',
+					tags: [],
+					fields: [],
+					joins: [],
+					defaultFilters: [],
+					sensitive: false
+				);
+			}
 
-                $service->calls = [];
-                $domains = $ms->listDomains();
-                $this->assertSame(['domains'], $domains);
-                $this->assertSame(['listDomains'], $service->calls);
+			public function executeQuery(array $queryJson): QueryResult {
+				$this->calls[] = ['executeQuery', $queryJson];
+				return new QueryResult(columns: [], rows: [], debugSql: null, sensitive: false);
+			}
 
-                $service->calls = [];
-                $cats = $ms->listCategories();
-                $this->assertSame(['categories'], $cats);
-                $this->assertSame(['listCategories'], $service->calls);
+			public function listDomains(): array {
+				$this->calls[] = 'listDomains';
+				return ['domains'];
+			}
 
-                $service->calls = [];
-                $tags = $ms->listTags();
-                $this->assertSame(['tags'], $tags);
-                $this->assertSame(['listTags'], $service->calls);
-        }
-}
+			public function listCategories(): array {
+				$this->calls[] = 'listCategories';
+				return ['categories'];
+			}
 
-/**
- * Simple fake that implements both interfaces so it matches the union type.
- */
-class FakeQueryServiceConnector implements IQueryService, IMicroserviceConnector {
+			public function listTags(): array {
+				$this->calls[] = 'listTags';
+				return ['tags'];
+			}
+		};
 
-        /** @var list<mixed> */
-        public array $calls = [];
+		$ms = new DataHawkMicroservice($service);
 
-        public function getMicroserviceUrl() {
-                return 'http://fake';
-        }
+		$tables = $ms->listTables();
+		$this->assertSame(['tables'], $tables);
+		$this->assertSame(['listTables'], $service->calls);
 
-        public function listTables(): array {
-                $this->calls[] = 'listTables';
-                return ['tables'];
-        }
+		$service->calls = [];
+		$table = $ms->getTable('users');
+		$this->assertInstanceOf(TableMetadata::class, $table);
+		$this->assertSame('users', $table->name);
+		$this->assertSame([['getTable', 'users']], $service->calls);
 
-        public function getTable(string $tableName): ?TableMetadata {
-                $this->calls[] = ['getTable', $tableName];
-                return new TableMetadata(
-                        name: $tableName,
-                        label: null,
-                        description: null,
-                        domain: 'd',
-                        category: 'c',
-                        tags: [],
-                        fields: [],
-                        joins: [],
-                        defaultFilters: [],
-                        sensitive: false
-                );
-        }
+		$service->calls = [];
+		$result = $ms->executeQuery(['q' => 1]);
+		$this->assertInstanceOf(QueryResult::class, $result);
+		$this->assertSame([['executeQuery', ['q' => 1]]], $service->calls);
 
-        public function executeQuery(array $queryJson): QueryResult {
-                $this->calls[] = ['executeQuery', $queryJson];
-                return new QueryResult(columns: [], rows: [], debugSql: null, sensitive: false);
-        }
+		$service->calls = [];
+		$domains = $ms->listDomains();
+		$this->assertSame(['domains'], $domains);
+		$this->assertSame(['listDomains'], $service->calls);
 
-        public function listDomains(): array {
-                $this->calls[] = 'listDomains';
-                return ['domains'];
-        }
+		$service->calls = [];
+		$cats = $ms->listCategories();
+		$this->assertSame(['categories'], $cats);
+		$this->assertSame(['listCategories'], $service->calls);
 
-        public function listCategories(): array {
-                $this->calls[] = 'listCategories';
-                return ['categories'];
-        }
-
-        public function listTags(): array {
-                $this->calls[] = 'listTags';
-                return ['tags'];
-        }
+		$service->calls = [];
+		$tags = $ms->listTags();
+		$this->assertSame(['tags'], $tags);
+		$this->assertSame(['listTags'], $service->calls);
+	}
 }
