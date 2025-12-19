@@ -2,84 +2,91 @@
 
 namespace DataHawk\Test\Schema;
 
-use PHPUnit\Framework\TestCase;
-use DataHawk\Schema\DataHawkSchemaMicroservice;
-use ResourceFoundation\Api\IQuerySchemaProvider;
 use Base3\Microservice\Api\IMicroserviceConnector;
+use DataHawk\Schema\DataHawkSchemaMicroservice;
+use PHPUnit\Framework\TestCase;
+use ResourceFoundation\Api\IQuerySchemaProvider;
 use ResourceFoundation\Dto\TableMetadata;
 
 class DataHawkSchemaMicroserviceTest extends TestCase {
 
-        public function testGetSchemaDelegatesToService(): void {
-                $service = new FakeSchemaService();
+	public function testGetSchemaDelegatesToService(): void {
+		$service = $this->createMock(IQuerySchemaProvider::class);
 
-                $ms = new DataHawkSchemaMicroservice($service);
+		$service->expects($this->once())
+			->method('getSchema')
+			->willReturn(['FAKE_SCHEMA']);
 
-                $schema = $ms->getSchema();
+		$ms = new DataHawkSchemaMicroservice($service);
 
-                $this->assertSame(1, $service->getSchemaCallCount);
-                $this->assertSame(['FAKE_SCHEMA'], $schema);
-        }
+		$this->assertSame(['FAKE_SCHEMA'], $ms->getSchema());
+	}
 
-        public function testGetTableDelegatesToServiceWithCorrectArgument(): void {
-                $service = new FakeSchemaService();
+	public function testGetTableDelegatesToServiceWithCorrectArgument(): void {
+		$service = $this->createMock(IQuerySchemaProvider::class);
 
-                $ms = new DataHawkSchemaMicroservice($service);
+		$service->expects($this->once())
+			->method('getTable')
+			->with('users')
+			->willReturn(new TableMetadata(
+				name: 'users',
+				label: null,
+				description: null,
+				domain: '',
+				category: '',
+				tags: [],
+				fields: [],
+				joins: [],
+				defaultFilters: [],
+				sensitive: false,
+				position: []
+			));
 
-                $table = $ms->getTable('users');
+		$ms = new DataHawkSchemaMicroservice($service);
 
-                $this->assertSame(1, $service->getTableCallCount);
-                $this->assertSame('users', $service->lastTableName);
+		$table = $ms->getTable('users');
 
-                $this->assertInstanceOf(TableMetadata::class, $table);
-                $this->assertSame('users', $table->name);
-        }
+		$this->assertInstanceOf(TableMetadata::class, $table);
+		$this->assertSame('users', $table->name);
+	}
 
-        public function testAcceptsMicroserviceConnectorTypeHintAsWell(): void {
-                $service = new FakeSchemaService(); // implements both interfaces
+	public function testAcceptsMicroserviceConnectorTypeHintAsWell(): void {
+		// The microservice constructor accepts IQuerySchemaProvider|IMicroserviceConnector,
+		// so we create a mock that implements both interfaces.
+		$service = $this->createMockForIntersectionOfInterfaces([
+			IQuerySchemaProvider::class,
+			IMicroserviceConnector::class
+		]);
 
-                $ms = new DataHawkSchemaMicroservice($service);
+		$service->expects($this->once())
+			->method('getSchema')
+			->willReturn(['FAKE_SCHEMA']);
 
-                $this->assertSame(['FAKE_SCHEMA'], $ms->getSchema());
-                $this->assertInstanceOf(TableMetadata::class, $ms->getTable('users'));
-                $this->assertSame('https://example.test/ms', $service->getMicroserviceUrl());
-        }
-}
+		$service->expects($this->once())
+			->method('getTable')
+			->with('users')
+			->willReturn(new TableMetadata(
+				name: 'users',
+				label: null,
+				description: null,
+				domain: '',
+				category: '',
+				tags: [],
+				fields: [],
+				joins: [],
+				defaultFilters: [],
+				sensitive: false,
+				position: []
+			));
 
-/**
- * Fake service that implements both constructor-accepted types:
- * IQuerySchemaProvider|IMicroserviceConnector.
- */
-class FakeSchemaService implements IQuerySchemaProvider, IMicroserviceConnector {
+		$service->expects($this->once())
+			->method('getMicroserviceUrl')
+			->willReturn('https://example.test/ms');
 
-        public int $getSchemaCallCount = 0;
-        public int $getTableCallCount = 0;
-        public ?string $lastTableName = null;
+		$ms = new DataHawkSchemaMicroservice($service);
 
-        public function getSchema(): array {
-                $this->getSchemaCallCount++;
-                return ['FAKE_SCHEMA'];
-        }
-
-        public function getTable(string $tableName): ?TableMetadata {
-                $this->getTableCallCount++;
-                $this->lastTableName = $tableName;
-
-                return new TableMetadata(
-                        name: $tableName,
-                        label: null,
-                        description: null,
-                        domain: '',
-                        category: '',
-                        tags: [],
-                        fields: [],
-                        joins: [],
-                        defaultFilters: [],
-                        sensitive: false
-                );
-        }
-
-        public function getMicroserviceUrl() {
-                return 'https://example.test/ms';
-        }
+		$this->assertSame(['FAKE_SCHEMA'], $ms->getSchema());
+		$this->assertInstanceOf(TableMetadata::class, $ms->getTable('users'));
+		$this->assertSame('https://example.test/ms', $service->getMicroserviceUrl());
+	}
 }

@@ -5,8 +5,6 @@ namespace DataHawk\Test;
 use PHPUnit\Framework\TestCase;
 use DataHawk\DataHawkPlugin;
 use Base3\Api\IContainer;
-use Base3\Api\IClassMap;
-use Base3\Configuration\Api\IConfiguration;
 use DataHawk\Api\IReportExporterFactory;
 use ResourceFoundation\Api\IQueryCompiler;
 use ResourceFoundation\Api\IQuerySchemaProvider;
@@ -14,115 +12,109 @@ use ResourceFoundation\Api\IQueryService;
 
 class DataHawkPluginTest extends TestCase {
 
-        public function testGetNameReturnsExpectedValue(): void {
-                $this->assertSame('datahawkplugin', DataHawkPlugin::getName());
-        }
+	public function testGetNameReturnsExpectedValue(): void {
+		$this->assertSame('datahawkplugin', DataHawkPlugin::getName());
+	}
 
-        public function testInitRegistersPluginInContainerAsShared(): void {
-                $container = new FakeContainer();
-                $plugin = new DataHawkPlugin($container);
+	public function testInitRegistersPluginInContainerAsShared(): void {
+		$calls = [];
 
-                $plugin->init();
+		$container = $this->createStub(IContainer::class);
+		$container->method('set')
+			->willReturnCallback(function(string $name, $definition, $flags) use (&$calls, $container) {
+				$calls[] = [
+					'name' => $name,
+					'definition' => $definition,
+					'flags' => (int)$flags,
+				];
+				return $container;
+			});
 
-                $this->assertTrue($container->has(DataHawkPlugin::getName()));
-                $this->assertSame(IContainer::SHARED, $container->getFlags(DataHawkPlugin::getName()));
-                $this->assertSame($plugin, $container->get(DataHawkPlugin::getName()));
-        }
+		$plugin = new DataHawkPlugin($container);
+		$plugin->init();
 
-        public function testInitRegistersServicesAsSharedAndNoOverwrite(): void {
-                $container = new FakeContainer();
-                $plugin = new DataHawkPlugin($container);
+		$found = false;
 
-                $plugin->init();
+		foreach ($calls as $call) {
+			if ($call['name'] !== DataHawkPlugin::getName()) {
+				continue;
+			}
 
-                $expected = [
-                        IQuerySchemaProvider::class,
-                        IQueryCompiler::class,
-                        IQueryService::class,
-                        IReportExporterFactory::class,
-                ];
+			$this->assertSame(IContainer::SHARED, $call['flags']);
+			$this->assertSame($plugin, $call['definition']);
+			$found = true;
+			break;
+		}
 
-                foreach ($expected as $id) {
-                        $this->assertTrue($container->has($id), "Container should have service: {$id}");
+		$this->assertTrue($found, 'Container::set() was not called for the plugin itself');
+	}
 
-                        $flags = $container->getFlags($id);
-                        $this->assertSame(
-                                IContainer::SHARED | IContainer::NOOVERWRITE,
-                                $flags,
-                                "Service {$id} should be registered as SHARED|NOOVERWRITE"
-                        );
+	public function testInitRegistersServicesAsSharedAndNoOverwrite(): void {
+		$calls = [];
 
-                        $definition = $container->getRawDefinition($id);
-                        $this->assertIsCallable($definition, "Service {$id} should be registered as a factory (callable)");
-                }
-        }
+		$container = $this->createStub(IContainer::class);
+		$container->method('set')
+			->willReturnCallback(function(string $name, $definition, $flags) use (&$calls, $container) {
+				$calls[] = [
+					'name' => $name,
+					'definition' => $definition,
+					'flags' => (int)$flags,
+				];
+				return $container;
+			});
 
-        public function testCheckDependenciesReturnsOkIfResourceFoundationPluginIsInstalled(): void {
-                $container = new FakeContainer();
-                $container->set('resourcefoundationplugin', new \stdClass(), 0);
+		$plugin = new DataHawkPlugin($container);
+		$plugin->init();
 
-                $plugin = new DataHawkPlugin($container);
+		$expected = [
+			IQuerySchemaProvider::class,
+			IQueryCompiler::class,
+			IQueryService::class,
+			IReportExporterFactory::class,
+		];
 
-                $result = $plugin->checkDependencies();
+		foreach ($expected as $id) {
+			$found = false;
 
-                $this->assertIsArray($result);
-                $this->assertSame('Ok', $result['resourcefoundationplugin_installed'] ?? null);
-        }
+			foreach ($calls as $call) {
+				if ($call['name'] !== $id) {
+					continue;
+				}
 
-        public function testCheckDependenciesReturnsErrorIfResourceFoundationPluginIsMissing(): void {
-                $container = new FakeContainer();
+				$this->assertSame(IContainer::SHARED | IContainer::NOOVERWRITE, $call['flags']);
+				$this->assertIsCallable($call['definition'], "Service {$id} should be registered as a factory (callable)");
+				$found = true;
+				break;
+			}
 
-                $plugin = new DataHawkPlugin($container);
+			$this->assertTrue($found, "Container::set() was not called for service: {$id}");
+		}
+	}
 
-                $result = $plugin->checkDependencies();
+	public function testCheckDependenciesReturnsOkIfResourceFoundationPluginIsInstalled(): void {
+		$container = $this->createStub(IContainer::class);
+		$container->method('get')->with('resourcefoundationplugin')->willReturn(new \stdClass());
 
-                $this->assertIsArray($result);
-                $this->assertSame(
-                        'resourcefoundationplugin not installed',
-                        $result['resourcefoundationplugin_installed'] ?? null
-                );
-        }
-}
+		$plugin = new DataHawkPlugin($container);
 
-class FakeContainer implements IContainer {
+		$result = $plugin->checkDependencies();
 
-        private array $items = [];
-        private array $flags = [];
+		$this->assertIsArray($result);
+		$this->assertSame('Ok', $result['resourcefoundationplugin_installed'] ?? null);
+	}
 
-        public function getServiceList(): array {
-                return array_keys($this->items);
-        }
+	public function testCheckDependenciesReturnsErrorIfResourceFoundationPluginIsMissing(): void {
+		$container = $this->createStub(IContainer::class);
+		$container->method('get')->with('resourcefoundationplugin')->willReturn(null);
 
-        public function set(string $name, $classDefinition, $flags = 0): IContainer {
-                $this->items[$name] = $classDefinition;
-                $this->flags[$name] = (int)$flags;
-                return $this;
-        }
+		$plugin = new DataHawkPlugin($container);
 
-        public function remove(string $name) {
-                unset($this->items[$name], $this->flags[$name]);
-        }
+		$result = $plugin->checkDependencies();
 
-        public function has(string $name): bool {
-                return array_key_exists($name, $this->items);
-        }
-
-        public function get(string $name) {
-                return $this->items[$name] ?? null;
-        }
-
-        /**
-         * Test helper: returns the flags used during ->set()
-         */
-        public function getFlags(string $name): ?int {
-                return $this->flags[$name] ?? null;
-        }
-
-        /**
-         * Test helper: returns the raw definition passed into ->set()
-         * (in this plugin these are closures for service factories).
-         */
-        public function getRawDefinition(string $name): mixed {
-                return $this->items[$name] ?? null;
-        }
+		$this->assertIsArray($result);
+		$this->assertSame(
+			'resourcefoundationplugin not installed',
+			$result['resourcefoundationplugin_installed'] ?? null
+		);
+	}
 }
