@@ -18,7 +18,7 @@ class JoinPlanner {
 	}
 
 	/**
-	 * Analysiert alle Elemente und extrahiert benötigte Tabellen (mit Variant)
+	 * Scans all elements and extracts required tables (including optional "variant").
 	 */
 	public function collectJoinDependencies(array $nodes): array {
 		$tables = [];
@@ -30,25 +30,27 @@ class JoinPlanner {
 			if (($node['type'] ?? null) === 'fld') {
 				$table = $node['table'];
 				$alias = $node['tablealias'] ?? $table;
+
 				$this->aliasResolver->registerAlias($alias, $table);
+
 				if (!isset($tables[$table])) {
 					$tables[$table] = $node['variant'] ?? null;
 				}
-				continue; // No deeper scan needed
+				continue;
 			}
 
 			// Recursively scan known subkeys
 			foreach (['element', 'params', 'query', 'args', 'left', 'right'] as $key) {
-				if (!empty($node[$key])) {
-					$childNodes = is_array($node[$key])
-						? (self::isAssoc($node[$key]) ? [$node[$key]] : $node[$key])
-						: [];
+				if (empty($node[$key])) continue;
 
-					$subTables = $this->collectJoinDependencies($childNodes);
+				$childNodes = is_array($node[$key])
+					? (self::isAssoc($node[$key]) ? [$node[$key]] : $node[$key])
+					: [];
 
-					foreach ($subTables as $tbl => $variant) {
-						if (!isset($tables[$tbl])) $tables[$tbl] = $variant;
-					}
+				$subTables = $this->collectJoinDependencies($childNodes);
+
+				foreach ($subTables as $tbl => $variant) {
+					if (!isset($tables[$tbl])) $tables[$tbl] = $variant;
 				}
 			}
 		}
@@ -61,12 +63,19 @@ class JoinPlanner {
 	}
 
 	/**
-	 * Build JOIN-SQL based of scaned aliasUsage and resolved paths
+	 * Builds JOIN SQL based on resolved join paths.
+	 *
+	 * Fixes:
+	 * - Global join deduplication (no duplicate JOINs across multiple join requests / overlapping paths)
+	 * - Correct join field quoting: alias is applied to the correct side (table being joined)
 	 */
 	public function compileJoins(string $from, array $joinRequests): string {
 		$sql = '';
-		$visited = [$from];
 		$aliasUsage = $this->aliasResolver->getAliasUsage();
+
+		// Global dedup map: table::alias => true
+		$joined = [];
+		$joined[$from . '::' . $from] = true;
 
 		foreach ($joinRequests as $target => $variant) {
 			if ($target === $from) continue;
@@ -76,7 +85,7 @@ class JoinPlanner {
 				throw new QueryValidationException("No join path from '$from' to '$target'");
 			}
 
-			// Fallback: bevorzugt "default"-Pfad
+			// Prefer a "default" path if available
 			$path = null;
 			foreach ($paths as $candidate) {
 				if (!empty($candidate[0]['meta']['default'])) {
@@ -90,29 +99,31 @@ class JoinPlanner {
 
 			foreach ($path as $step) {
 				$table = $step['to'];
+
+				// Use all aliases that are actually referenced for this table; if none, fall back to the table name.
 				$aliases = array_keys($aliasUsage[$table] ?? [$table => true]);
 
 				foreach ($aliases as $alias) {
 					$alreadyJoined = "{$table}::{$alias}";
-					$joined = [];
-
 					if (isset($joined[$alreadyJoined])) continue;
 					$joined[$alreadyJoined] = true;
 
 					$this->aliasResolver->registerAlias($alias, $table);
 
-					$isDefault = $step['meta']['default'] ?? false;
-					$stepType = strtoupper($step['meta']['type'] ?? 'INNER');
+					$isDefault = (bool)($step['meta']['default'] ?? false);
+					$stepType = strtoupper((string)($step['meta']['type'] ?? 'INNER'));
 					$isLastStep = ($step === $lastStep);
 
-					$useLeft = ($isLastStep && $variant && strtoupper($variant) === 'OPTIONAL')
+					// Determine join type (default join type can come from schema meta; variant may override on last step).
+					$useLeft = ($isLastStep && $variant && strtoupper((string)$variant) === 'OPTIONAL')
 						|| ($isLastStep && !$variant && $isDefault && $stepType === 'LEFT');
 
 					$joinType = $useLeft ? 'LEFT JOIN' : 'INNER JOIN';
 
+					// Build ON clause (apply alias only for the table that is being joined in this step)
 					$onParts = [];
-					foreach ($step['meta']['on'] as $left => $right) {
-						$onParts[] = $this->quoteJoinField($left) . ' = ' . $this->quoteJoinField($right, $alias);
+					foreach (($step['meta']['on'] ?? []) as $left => $right) {
+						$onParts[] = $this->quoteJoinField($left, $table, $alias) . ' = ' . $this->quoteJoinField($right, $table, $alias);
 					}
 
 					$sql .= " $joinType " . $this->elementCompiler->quoteIdentifier($table);
@@ -127,13 +138,22 @@ class JoinPlanner {
 		return $sql;
 	}
 
-	private function quoteJoinField(string $str, ?string $aliasOverride = null): string {
-		if (str_contains($str, '.')) {
-			[$table, $field] = explode('.', $str, 2);
-			$alias = $aliasOverride ?? $this->aliasResolver->getAliasForTable($table) ?? $table;
-			return $this->elementCompiler->quoteIdentifier($alias) . '.' . $this->elementCompiler->quoteIdentifier($field);
+	/**
+	 * Quotes "table.field" with correct aliasing:
+	 * - If the reference uses the table that is currently being joined, replace it by $joinAlias.
+	 * - Otherwise keep the table as-is (it may already be an alias or a base table).
+	 */
+	private function quoteJoinField(string $ref, string $joinTable, string $joinAlias): string {
+		if (!str_contains($ref, '.')) {
+			// Fallback: treat as identifier
+			return $this->elementCompiler->quoteIdentifier($ref);
 		}
-		return $this->elementCompiler->quoteIdentifier($aliasOverride ?? $str);
+
+		[$tableOrAlias, $field] = explode('.', $ref, 2);
+
+		// Only rewrite the side that references the table being joined in the current step.
+		$usedTable = ($tableOrAlias === $joinTable) ? $joinAlias : $tableOrAlias;
+
+		return $this->elementCompiler->quoteIdentifier($usedTable) . '.' . $this->elementCompiler->quoteIdentifier($field);
 	}
 }
-
