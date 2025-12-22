@@ -19,12 +19,21 @@ class JoinPlanner {
 
 	/**
 	 * Scans all elements and extracts required tables (including optional "variant").
+	 *
+	 * IMPORTANT:
+	 * - Tables inside subqueries must NOT trigger JOINs in the outer query.
+	 *   Otherwise EXISTS(subquery) may accidentally introduce outer joins / duplicates.
 	 */
 	public function collectJoinDependencies(array $nodes): array {
 		$tables = [];
 
 		foreach ($nodes as $node) {
 			if (!is_array($node)) continue;
+
+			// If this node is a subquery wrapper, do NOT scan into it for outer JOIN planning.
+			if (($node['type'] ?? null) === 'subquery') {
+				continue;
+			}
 
 			// Direct field reference
 			if (($node['type'] ?? null) === 'fld') {
@@ -39,8 +48,8 @@ class JoinPlanner {
 				continue;
 			}
 
-			// Recursively scan known subkeys
-			foreach (['element', 'params', 'query', 'args', 'left', 'right'] as $key) {
+			// Recursively scan known subkeys (but NOT 'query' to avoid pulling in subquery tables)
+			foreach (['element', 'params', 'args', 'left', 'right'] as $key) {
 				if (empty($node[$key])) continue;
 
 				$childNodes = is_array($node[$key])

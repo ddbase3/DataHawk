@@ -80,9 +80,11 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 			}
 
 			$element = $entry['element'];
-			$fieldTable = $element['table'] ?? null;
-			$fieldName = $element['field'] ?? null;
-			$alias = $entry['alias'] ?? $element['alias'] ?? null;
+
+			// ✅ Allow scalar elements in SELECT fields (e.g. 1, "x", true, null)
+			$fieldTable = is_array($element) ? ($element['table'] ?? null) : null;
+			$fieldName = is_array($element) ? ($element['field'] ?? null) : null;
+			$alias = $entry['alias'] ?? (is_array($element) ? ($element['alias'] ?? null) : null);
 
 			$isWildcard = ($fieldName === '*');
 			if ($isWildcard) $hasWildcard = true;
@@ -109,7 +111,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 				'name'      => $fieldName,
 				'alias'     => $alias,
 				'table'     => $fieldTable,
-				'type'      => $element['type'] ?? null,
+				'type'      => is_array($element) ? ($element['type'] ?? null) : null,
 				'distinct'  => !empty($entry['distinct']) || !empty($query['distinct']),
 				'sensitive' => $fieldSensitive,
 				'wildcard'  => $isWildcard
