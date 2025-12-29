@@ -2,6 +2,7 @@
 
 namespace DataHawk\Export;
 
+use Base3\Api\IAssetResolver;
 use DataHawk\Api\IReportExporter;
 use ResourceFoundation\Api\IQueryService;
 use ResourceFoundation\Dto\QueryResult;
@@ -10,7 +11,10 @@ class BarChartReportExporter implements IReportExporter {
 
     private ?QueryResult $result = null;
 
-    public function __construct(private readonly IQueryService $reportqueryservice) {}
+    public function __construct(
+        private readonly IQueryService $reportqueryservice,
+        private readonly IAssetResolver $assetResolver
+    ) {}
 
     public static function getName(): string {
         return 'barchartreportexporter';
@@ -43,7 +47,7 @@ class BarChartReportExporter implements IReportExporter {
         $html = '<div style="height:300px;"><canvas id="' . $uniqueid . '"></canvas></div>';
         $html .= '<script>';
         $html .= '(async () => {';
-        $html .= 'await AssetLoader.loadScriptAsync("plugin/ClientStack/assets/chart/chart.js");';
+        $html .= 'await AssetLoader.loadScriptAsync("' . $this->assetResolver->resolve('plugin/ClientStack/assets/chart/chart.js') . '");';
         $html .= 'console.log("Chart.js loaded");';
         $html .= 'var result = ' . json_encode($this->result->rows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';';
         $html .= 'var labels = []; var data = [];';
