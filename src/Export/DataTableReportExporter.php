@@ -2,6 +2,7 @@
 
 namespace DataHawk\Export;
 
+use Base3\Api\IAssetResolver;
 use DataHawk\Api\IReportExporter;
 use ResourceFoundation\Api\IQueryService;
 use ResourceFoundation\Dto\QueryResult;
@@ -10,7 +11,10 @@ class DataTableReportExporter implements IReportExporter {
 
 	private ?QueryResult $result = null;
 
-	public function __construct(private readonly IQueryService $reportqueryservice) {}
+	public function __construct(
+		private readonly IQueryService $reportqueryservice,
+		private readonly IAssetResolver $assetResolver
+	) {}
 
 	public static function getName(): string {
 		return 'datatablereportexporter';
@@ -43,8 +47,8 @@ class DataTableReportExporter implements IReportExporter {
 		$html = '<div id="' . $uniqueid . '"></div>';
 		$html .= '<script>';
 		$html .= '(async () => {';
-		$html .= 'await AssetLoader.loadScriptAsync("plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.js");';
-		$html .= 'await AssetLoader.loadCssAsync("plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.css");';
+		$html .= 'await AssetLoader.loadScriptAsync("' . $this->assetResolver->resolve('plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.js') . '");';
+		$html .= 'await AssetLoader.loadCssAsync("' . $this->assetResolver->resolve('plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.css') . '");';
 		$html .= 'console.log("JqueryDataTable loaded");';
 		$html .= 'var data = ' . json_encode($this->result->rows) . ';';
 		$html .= 'var cols = ' . json_encode($cols) . ';';
