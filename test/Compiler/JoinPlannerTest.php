@@ -14,12 +14,10 @@ class JoinPlannerTest extends TestCase {
 	private JoinPlanner $joinPlanner;
 
 	protected function setUp(): void {
-		// Alle Abhängigkeiten als Stubs, damit keine PHPUnit-Notices entstehen
 		$this->aliasResolver = $this->createStub(AliasResolver::class);
 		$this->elementCompiler = $this->createStub(ElementCompiler::class);
 		$this->joinGraph = $this->createStub(Graph::class);
 
-		// quoteIdentifier: einfache Backticks
 		$this->elementCompiler
 			->method('quoteIdentifier')
 			->willReturnCallback(fn(string $id) => '`' . $id . '`');
@@ -84,7 +82,6 @@ class JoinPlannerTest extends TestCase {
 		$from = 'users';
 		$joinRequests = ['orders' => null];
 
-		// Keine Pfade → Exception erwartet
 		$this->joinGraph
 			->method('findAllPaths')
 			->with('users', 'orders')
@@ -126,19 +123,12 @@ class JoinPlannerTest extends TestCase {
 		$this->aliasResolver
 			->method('getAliasUsage')
 			->willReturn([
-				'orders' => ['o' => true]
-			]);
-
-		$this->aliasResolver
-			->method('getAliasForTable')
-			->willReturnMap([
-				['users', 'u']
+				'orders' => ['o' => true],
 			]);
 
 		$sql = $this->joinPlanner->compileJoins($from, $joinRequests);
 
-		$expected = " LEFT JOIN `orders` AS `o` ON `u`.`id` = `o`.`user_id`";
-
+		$expected = " LEFT JOIN `orders` AS `o` ON `users`.`id` = `o`.`user_id`";
 		$this->assertSame($expected, $sql);
 	}
 
@@ -168,19 +158,12 @@ class JoinPlannerTest extends TestCase {
 		$this->aliasResolver
 			->method('getAliasUsage')
 			->willReturn([
-				'profiles' => ['profiles' => true]
-			]);
-
-		$this->aliasResolver
-			->method('getAliasForTable')
-			->willReturnMap([
-				['users', 'u']
+				'profiles' => ['profiles' => true],
 			]);
 
 		$sql = $this->joinPlanner->compileJoins($from, $joinRequests);
 
-		$expected = " LEFT JOIN `profiles` ON `u`.`id` = `profiles`.`user_id`";
-
+		$expected = " LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id`";
 		$this->assertSame($expected, $sql);
 	}
 }

@@ -1,99 +1,124 @@
 <?php declare(strict_types=1);
 
+/**
+ * Filename: plugin/DataHawk/test/Export/BarChartReportExporterTest.php
+ */
+
 namespace DataHawk\Test\Export;
 
 use PHPUnit\Framework\TestCase;
 use DataHawk\Export\BarChartReportExporter;
 use ResourceFoundation\Api\IQueryService;
+use Base3\Api\IAssetResolver;
 
 class BarChartReportExporterTest extends TestCase {
-        use ExportTestHelperTrait;
+	use ExportTestHelperTrait;
 
-        public function testGetNameReturnsExpectedValue(): void {
-                $this->assertSame('barchartreportexporter', BarChartReportExporter::getName());
-        }
+	public function testGetNameReturnsExpectedValue(): void {
+		$this->assertSame('barchartreportexporter', BarChartReportExporter::getName());
+	}
 
-        public function testSetExportQueryCallsQueryServiceAndStoresResult(): void {
-                $result = $this->makeQueryResult(
-                        columns: [['name' => 'label'], ['name' => 'value']],
-                        rows: [['label' => 'A', 'value' => 1]],
-                        debugSql: 'SELECT 1'
-                );
+	public function testSetExportQueryCallsQueryServiceAndStoresResult(): void {
+		$result = $this->makeQueryResult(
+			columns: [['name' => 'label'], ['name' => 'value']],
+			rows: [['label' => 'A', 'value' => 1]],
+			debugSql: 'SELECT 1'
+		);
 
-                $svc = $this->createMock(IQueryService::class);
-                $svc->expects($this->once())
-                        ->method('executeQuery')
-                        ->with(['q' => 1])
-                        ->willReturn($result);
+		$svc = $this->createMock(IQueryService::class);
+		$svc->expects($this->once())
+			->method('executeQuery')
+			->with(['q' => 1])
+			->willReturn($result);
 
-                $exp = new BarChartReportExporter($svc);
-                $exp->setExportQuery(['q' => 1]);
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturn('/dummy/chart.js');
 
-                $this->assertSame($result, $exp->getResult());
-        }
+		$exp = new BarChartReportExporter($svc, $assets);
+		$exp->setExportQuery(['q' => 1]);
 
-        public function testToStringThrowsIfNoResultSet(): void {
-                $svc = $this->createStub(IQueryService::class);
-                $exp = new BarChartReportExporter($svc);
+		$this->assertSame($result, $exp->getResult());
+	}
 
-                $this->expectException(\RuntimeException::class);
-                $this->expectExceptionMessage('No query result set for export.');
-                $exp->toString();
-        }
+	public function testToStringThrowsIfNoResultSet(): void {
+		$svc = $this->createStub(IQueryService::class);
 
-        public function testToStringOutputsBarChartAndHexEncodesRowJson(): void {
-                $svc = $this->createStub(IQueryService::class);
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturn('/dummy/chart.js');
 
-                $result = $this->makeQueryResult(
-                        columns: [['name' => 'label'], ['name' => 'value']],
-                        rows: [['label' => '<b>X</b>', 'value' => 7]],
-                        debugSql: null
-                );
+		$exp = new BarChartReportExporter($svc, $assets);
 
-                $exp = new BarChartReportExporter($svc);
-                $exp->setResult($result);
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('No query result set for export.');
+		$exp->toString();
+	}
 
-                $html = $exp->toString();
+	public function testToStringOutputsBarChartAndHexEncodesRowJson(): void {
+		$svc = $this->createStub(IQueryService::class);
 
-                $this->assertMatchesRegularExpression('/<canvas id="bar[a-z0-9]+">/i', $html);
-                $this->assertStringContainsString('type: "bar"', $html);
-                $this->assertStringContainsString('new Chart', $html);
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturn('/dummy/chart.js');
 
-                // JSON_HEX_TAG encodes '<' and '>' as \u003C / \u003E
-                $this->assertStringContainsString('\u003Cb\u003EX\u003C\/b\u003E', $html);
-        }
+		$result = $this->makeQueryResult(
+			columns: [['name' => 'label'], ['name' => 'value']],
+			rows: [['label' => '<b>X</b>', 'value' => 7]],
+			debugSql: null
+		);
 
-        public function testToFileWritesHtml(): void {
-                $svc = $this->createStub(IQueryService::class);
+		$exp = new BarChartReportExporter($svc, $assets);
+		$exp->setResult($result);
 
-                $result = $this->makeQueryResult(
-                        columns: [['name' => 'label'], ['name' => 'value']],
-                        rows: [['label' => 'A', 'value' => 1]],
-                        debugSql: null
-                );
+		$html = $exp->toString();
 
-                $exp = new BarChartReportExporter($svc);
-                $exp->setResult($result);
+		$this->assertMatchesRegularExpression('/<canvas id="bar[a-z0-9]+">/i', $html);
+		$this->assertStringContainsString('type: "bar"', $html);
+		$this->assertStringContainsString('new Chart', $html);
 
-                $file = $this->tempFilePath('barchart_') . '.html';
-                $exp->toFile($file);
+		// AssetResolver usage is present
+		$this->assertStringContainsString('AssetLoader.loadScriptAsync("/dummy/chart.js")', $html);
 
-                $this->assertFileExists($file);
-                $this->assertNotSame('', (string)file_get_contents($file));
-                @unlink($file);
-        }
+		// JSON_HEX_TAG encodes '<' and '>' as \u003C / \u003E
+		$this->assertStringContainsString('\u003Cb\u003EX\u003C\/b\u003E', $html);
+	}
 
-        public function testMimeTypeAndExtensionAndToSql(): void {
-                $svc = $this->createStub(IQueryService::class);
-                $exp = new BarChartReportExporter($svc);
+	public function testToFileWritesHtml(): void {
+		$svc = $this->createStub(IQueryService::class);
 
-                $this->assertSame('text/html', $exp->getMimeType());
-                $this->assertSame('html', $exp->getFileExtension());
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturn('/dummy/chart.js');
 
-                $exp->setResult($this->makeQueryResult(columns: [], rows: [], debugSql: 'SELECT X'));
-                $this->assertSame('SELECT X', $exp->toSql());
+		$result = $this->makeQueryResult(
+			columns: [['name' => 'label'], ['name' => 'value']],
+			rows: [['label' => 'A', 'value' => 1]],
+			debugSql: null
+		);
 
-                $exp->setResult($this->makeQueryResult(columns: [], rows: [], debugSql: null));
-                $this->assertSame('', $exp->toSql());
-        }
+		$exp = new BarChartReportExporter($svc, $assets);
+		$exp->setResult($result);
+
+		$file = $this->tempFilePath('barchart_') . '.html';
+		$exp->toFile($file);
+
+		$this->assertFileExists($file);
+		$this->assertNotSame('', (string)file_get_contents($file));
+		@unlink($file);
+	}
+
+	public function testMimeTypeAndExtensionAndToSql(): void {
+		$svc = $this->createStub(IQueryService::class);
+
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturn('/dummy/chart.js');
+
+		$exp = new BarChartReportExporter($svc, $assets);
+
+		$this->assertSame('text/html', $exp->getMimeType());
+		$this->assertSame('html', $exp->getFileExtension());
+
+		$exp->setResult($this->makeQueryResult(columns: [], rows: [], debugSql: 'SELECT X'));
+		$this->assertSame('SELECT X', $exp->toSql());
+
+		$exp->setResult($this->makeQueryResult(columns: [], rows: [], debugSql: null));
+		$this->assertSame('', $exp->toSql());
+	}
 }

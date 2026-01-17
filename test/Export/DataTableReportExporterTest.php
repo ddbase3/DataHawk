@@ -1,100 +1,130 @@
 <?php declare(strict_types=1);
 
+/**
+ * Filename: plugin/DataHawk/test/Export/DataTableReportExporterTest.php
+ */
+
 namespace DataHawk\Test\Export;
 
 use PHPUnit\Framework\TestCase;
 use DataHawk\Export\DataTableReportExporter;
 use ResourceFoundation\Api\IQueryService;
+use Base3\Api\IAssetResolver;
 
 class DataTableReportExporterTest extends TestCase {
-        use ExportTestHelperTrait;
+	use ExportTestHelperTrait;
 
-        public function testGetNameReturnsExpectedValue(): void {
-                $this->assertSame('datatablereportexporter', DataTableReportExporter::getName());
-        }
+	public function testGetNameReturnsExpectedValue(): void {
+		$this->assertSame('datatablereportexporter', DataTableReportExporter::getName());
+	}
 
-        public function testSetExportQueryCallsQueryServiceAndStoresResult(): void {
-                $result = $this->makeQueryResult(
-                        columns: [['name' => 'a']],
-                        rows: [[1]],
-                        debugSql: 'SELECT 1'
-                );
+	public function testSetExportQueryCallsQueryServiceAndStoresResult(): void {
+		$result = $this->makeQueryResult(
+			columns: [['name' => 'a']],
+			rows: [[1]],
+			debugSql: 'SELECT 1'
+		);
 
-                $svc = $this->createMock(IQueryService::class);
-                $svc->expects($this->once())
-                        ->method('executeQuery')
-                        ->with(['q' => 1])
-                        ->willReturn($result);
+		$svc = $this->createMock(IQueryService::class);
+		$svc->expects($this->once())
+			->method('executeQuery')
+			->with(['q' => 1])
+			->willReturn($result);
 
-                $exp = new DataTableReportExporter($svc);
-                $exp->setExportQuery(['q' => 1]);
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturnCallback(static function (string $path): string {
+			// keep it simple: exporter expects resolved string to be inlined into JS
+			return $path;
+		});
 
-                $this->assertSame($result, $exp->getResult());
-        }
+		$exp = new DataTableReportExporter($svc, $assets);
+		$exp->setExportQuery(['q' => 1]);
 
-        public function testToStringThrowsIfNoResultSet(): void {
-                $svc = $this->createStub(IQueryService::class);
-                $exp = new DataTableReportExporter($svc);
+		$this->assertSame($result, $exp->getResult());
+	}
 
-                $this->expectException(\RuntimeException::class);
-                $this->expectExceptionMessage('No query result set for export.');
-                $exp->toString();
-        }
+	public function testToStringThrowsIfNoResultSet(): void {
+		$svc = $this->createStub(IQueryService::class);
 
-        public function testToStringBuildsColumnsJsonAndLoadsAssets(): void {
-                $svc = $this->createStub(IQueryService::class);
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturnCallback(static fn(string $path): string => $path);
 
-                $result = $this->makeQueryResult(
-                        columns: [['name' => 'name'], ['name' => 'count']],
-                        rows: [['name' => 'Alice', 'count' => 2]]
-                );
+		$exp = new DataTableReportExporter($svc, $assets);
 
-                $exp = new DataTableReportExporter($svc);
-                $exp->setResult($result);
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('No query result set for export.');
+		$exp->toString();
+	}
 
-                $html = $exp->toString();
+	public function testToStringBuildsColumnsJsonAndLoadsAssets(): void {
+		$svc = $this->createStub(IQueryService::class);
 
-                $this->assertMatchesRegularExpression('/<div id="dt[a-z0-9]+">/i', $html);
-                $this->assertStringContainsString('jqueryDataTable', $html);
-                $this->assertStringContainsString('loadScriptAsync("plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.js")', $html);
-                $this->assertStringContainsString('loadCssAsync("plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.css")', $html);
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturnCallback(static fn(string $path): string => $path);
 
-                $this->assertStringContainsString('"key":"name"', $html);
-                $this->assertStringContainsString('"label":"name"', $html);
-                $this->assertStringContainsString('"key":"count"', $html);
-                $this->assertStringContainsString('"label":"count"', $html);
-        }
+		$result = $this->makeQueryResult(
+			columns: [['name' => 'name'], ['name' => 'count']],
+			rows: [['name' => 'Alice', 'count' => 2]],
+			debugSql: null
+		);
 
-        public function testToFileWritesHtml(): void {
-                $svc = $this->createStub(IQueryService::class);
+		$exp = new DataTableReportExporter($svc, $assets);
+		$exp->setResult($result);
 
-                $result = $this->makeQueryResult(
-                        columns: [['name' => 'a']],
-                        rows: [[1]]
-                );
+		$html = $exp->toString();
 
-                $exp = new DataTableReportExporter($svc);
-                $exp->setResult($result);
+		$this->assertMatchesRegularExpression('/<div id="dt[a-z0-9]+">/i', $html);
+		$this->assertStringContainsString('jqueryDataTable', $html);
 
-                $file = $this->tempFilePath('datatable_') . '.html';
-                $exp->toFile($file);
+		// AssetLoader calls include resolved paths (we return same path)
+		$this->assertStringContainsString('loadScriptAsync("plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.js")', $html);
+		$this->assertStringContainsString('loadCssAsync("plugin/ClientStack/assets/jquerydatatable/jquery.datatable.min.css")', $html);
 
-                $this->assertFileExists($file);
-                $this->assertNotSame('', (string)file_get_contents($file));
-                @unlink($file);
-        }
+		// Columns mapping uses key/label from column names
+		$this->assertStringContainsString('"key":"name"', $html);
+		$this->assertStringContainsString('"label":"name"', $html);
+		$this->assertStringContainsString('"key":"count"', $html);
+		$this->assertStringContainsString('"label":"count"', $html);
+	}
 
-        public function testMimeTypeAndExtensionAndToSql(): void {
-                $svc = $this->createStub(IQueryService::class);
-                $exp = new DataTableReportExporter($svc);
+	public function testToFileWritesHtml(): void {
+		$svc = $this->createStub(IQueryService::class);
 
-                $this->assertSame('text/html', $exp->getMimeType());
-                $this->assertSame('html', $exp->getFileExtension());
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturnCallback(static fn(string $path): string => $path);
 
-                $exp->setResult($this->makeQueryResult(columns: [], rows: [], debugSql: 'SELECT X'));
-                $this->assertSame('SELECT X', $exp->toSql());
+		$result = $this->makeQueryResult(
+			columns: [['name' => 'a']],
+			rows: [[1]],
+			debugSql: null
+		);
 
-                $exp->setResult($this->makeQueryResult(columns: [], rows: [], debugSql: null));
-                $this->assertSame('', $exp->toSql());
-        }
+		$exp = new DataTableReportExporter($svc, $assets);
+		$exp->setResult($result);
+
+		$file = $this->tempFilePath('datatable_') . '.html';
+		$exp->toFile($file);
+
+		$this->assertFileExists($file);
+		$this->assertNotSame('', (string)file_get_contents($file));
+		@unlink($file);
+	}
+
+	public function testMimeTypeAndExtensionAndToSql(): void {
+		$svc = $this->createStub(IQueryService::class);
+
+		$assets = $this->createStub(IAssetResolver::class);
+		$assets->method('resolve')->willReturnCallback(static fn(string $path): string => $path);
+
+		$exp = new DataTableReportExporter($svc, $assets);
+
+		$this->assertSame('text/html', $exp->getMimeType());
+		$this->assertSame('html', $exp->getFileExtension());
+
+		$exp->setResult($this->makeQueryResult(columns: [], rows: [], debugSql: 'SELECT X'));
+		$this->assertSame('SELECT X', $exp->toSql());
+
+		$exp->setResult($this->makeQueryResult(columns: [], rows: [], debugSql: null));
+		$this->assertSame('', $exp->toSql());
+	}
 }
