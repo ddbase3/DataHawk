@@ -2,9 +2,8 @@
 
 namespace DataHawk\Test\Service;
 
-require_once __DIR__ . '/FakeClassMap.php';
-
 use PHPUnit\Framework\TestCase;
+use Base3\Test\Core\ClassMapStub;
 use DataHawk\Service\ReportExporterFactory;
 use DataHawk\Api\IReportExporter;
 
@@ -13,21 +12,27 @@ class ReportExporterFactoryTest extends TestCase {
 	public function testCreateExporterReturnsExporterFromClassMap(): void {
 		$exporter = $this->createStub(IReportExporter::class);
 
-		$classmap = new FakeClassMap();
-		$classmap->returnValue = $exporter;
+		// The factory resolves via getInstanceByInterfaceName(interface, name),
+		// so we must register BOTH: name -> class and interface -> class.
+		$class = get_class($exporter);
+
+		$classmap = new ClassMapStub();
+		$classmap->registerName('csvreportexporter', $class);
+		$classmap->registerInterface(IReportExporter::class, $class);
 
 		$factory = new ReportExporterFactory($classmap);
 
 		$created = $factory->createExporter('csvreportexporter');
-		$this->assertSame($exporter, $created);
+		$this->assertInstanceOf(IReportExporter::class, $created);
 
-		$this->assertSame(IReportExporter::class, $classmap->lastInterface);
-		$this->assertSame('csvreportexporter', $classmap->lastName);
+		// Note: DI-free ClassMapStub instantiates a NEW instance of the registered class.
+		// So we cannot assertSame($exporter, $created).
 	}
 
 	public function testCreateExporterThrowsWhenClassMapReturnsInvalidInstance(): void {
-		$classmap = new FakeClassMap();
-		$classmap->returnValue = new \stdClass();
+		$classmap = new ClassMapStub();
+		$classmap->registerName('nope', \stdClass::class);
+		$classmap->registerInterface(IReportExporter::class, \stdClass::class);
 
 		$factory = new ReportExporterFactory($classmap);
 
