@@ -21,7 +21,7 @@ class DataHawkSchema implements IOutput {
 		return 'datahawkschema';
 	}
 
-	public function getOutput($out = "html") {
+	public function getOutput(string $out = 'html', bool $final = false): string {
 		if ($out != 'json') die();
 
 		switch ($this->request->get('q') ?? $this->request->post('q')) {
@@ -42,8 +42,7 @@ class DataHawkSchema implements IOutput {
 		return '';
 	}
 
-	public function getHelp() {
+	public function getHelp(): string {
 		return 'Help of DataHawkSchema' . "\n";
 	}
 }
-
