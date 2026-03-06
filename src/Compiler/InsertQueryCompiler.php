@@ -12,7 +12,10 @@ use ResourceFoundation\Exception\QueryValidationException;
  *
  * Supports:
  * - INSERT INTO ... VALUES (...)
+ * - INSERT IGNORE INTO ... VALUES (...)
  * - INSERT INTO ... SELECT ...
+ * - INSERT IGNORE INTO ... SELECT ...
+ * - optional ON DUPLICATE KEY UPDATE ...
  */
 class InsertQueryCompiler implements IReportQueryTypeCompiler {
 
@@ -31,8 +34,9 @@ class InsertQueryCompiler implements IReportQueryTypeCompiler {
 	public function compile(array $query): QueryStatement {
 		$table = $query['table'];
 		$columns = $query['columns'] ?? null;
+		$ignore = !empty($query['ignore']);
 
-		$sql = 'INSERT INTO ' . $this->elementCompiler->quoteIdentifier($table);
+		$sql = ($ignore ? 'INSERT IGNORE INTO ' : 'INSERT INTO ') . $this->elementCompiler->quoteIdentifier($table);
 
 		// Optional: column list
 		if ($columns) {
