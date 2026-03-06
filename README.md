@@ -1,82 +1,82 @@
 # DataHawk Plugin for BASE3 Framework
 
-The **DataHawk** plugin extends the [BASE3](https://github.com/ddbase3/Base3Framework) framework with a comprehensive, modular reporting and query engine. It enables dynamic report generation, flexible data access, and UI-driven analysis — all while enforcing schema-based security and advanced metadata.
+The **DataHawk** plugin extends the BASE3 framework with a schema-driven query engine for reporting and data access. Queries are defined as structured JSON arrays, compiled to SQL, and executed through the BASE3 `IDatabase` abstraction.
 
 ---
 
 ## Features
 
-### ✨ Schema-Driven Query System
+### Schema-driven query system
 
-* JSON-based query format with support for:
+* JSON query format compiled by `MysqlReportQueryCompiler`
+* Supported element/expression types via `ElementCompiler`:
 
-  * `select`, `from`, `where`, `group_by`, `having`, `order_by`, `limit`, `offset`
-  * complex expressions via `fn` (functions), `op` (operations), `subquery`
-  * table joins resolved automatically via graph traversal
-* Supports table aliases, optional/required join variants, and join path resolution
-* Custom metadata per field: `description`, `nullable`, `tags`, `alias`, `sensitive`
+  * `fld` (field reference, optional `tablealias`)
+  * `fn` (functions, incl. special handling for `GROUP_CONCAT`, plus `CAST`, `CONVERT`)
+  * `windowfn` (window functions with `OVER`, optional `partition_by` / `order_by`)
+  * `op` (operations like `=`, `AND`, `OR`, `IN`, `NOT IN`, `BETWEEN`, `IS NULL`, `IS NOT NULL`, …)
+  * `case` (CASE WHEN … THEN … ELSE … END)
+  * `subquery` (nested queries)
+  * Scalars are allowed directly (`"text"`, `42`, `true`, `null`)
+* Automatic join planning (schema join graph + `variant` hints like `required`/`optional`)
+* Aliasing support for stable column names in results
 
-### 🔒 Sensitivity and Data Protection
+### Sensitivity and data protection
 
-* Fields and tables can be marked as `sensitive`
-* Query compilation detects sensitivity and marks `QueryStatement::$sensitive`
-* `QueryResult` includes per-column sensitivity flags
-* Future-proof for export filtering, masking, and audit policies
+* Tables/fields can be marked as `sensitive` in schema metadata
+* Compilation marks sensitivity in compiled statements
+* `QueryResult` includes per-column sensitivity flags (plus result-level `sensitive`)
 
-### ⚖️ Schema Management
+### Schema management
 
-* Schema provided by `IQuerySchemaProvider` implementation (default: `DefaultReportSchemaProvider`)
-* Loaded from JSON files via configurable data directory
+* Schema is provided by an `IQuerySchemaProvider` (default: JSON-based provider)
 * Table metadata includes joins, tags, categories, domains, default filters
 
-### 📈 Query Execution
+### Query execution
 
-* Queries compiled by `ReportQueryCompiler` into raw SQL
-* Execution via `IDatabase` abstraction (supports multiQuery, scalarQuery, etc.)
-* Field aliasing supported
-* Sensitivity computed at compile time
-* Result delivered as `QueryResult` with:
+* Execution via `IQueryService` (default: `DataHawk\Service\DefaultReportQueryService`)
+* Uses BASE3 `IDatabase` for execution
+* Integrity validation for select results (unless wildcard mode is enabled)
 
-  * Columns (name, type, field, alias, table, sensitive)
-  * Rows (array of values)
-  * Debug SQL string
+### Write queries: affected rows and insert id
 
-### ⚙️ Extensibility
+`QueryResult` now also provides write metadata:
 
-* Plugin-based design under `DataHawk` namespace
-* Designed to integrate with BASE3 UI features: column selector, filters, sorting
-* Extendable with new schema providers, query compilers, exporters
+* `affectedRows` — affected rows for INSERT/UPDATE/DELETE (if known)
+* `insertId` — last insert id for `type: "insert"` (backend-dependent)
 
----
+### Transactions
 
-## Exporters
+DataHawk supports atomic multi-step operations using a **transaction query type**:
 
-| Format     | Class                     | Use Case                                  |
-| ---------- | ------------------------- | ----------------------------------------- |
-| CSV        | `CsvReportExporter`       | Data analysis, Excel import, simple tools |
-| JSON       | `JsonReportExporter`      | APIs, integration, serialization          |
-| HTML       | `HtmlReportExporter`      | Web preview, printing, PDF generation     |
-| HTML-Mail  | `HtmlTableReportExporter` | Email delivery, HTML templates            |
-| Excel-HTML | `ExcelHtmlReportExporter` | Excel download without external libraries |
+* `type: "transaction"` executes multiple subqueries within a DB transaction.
+* On any failure, the transaction is rolled back.
+* Errors are propagated as **exceptions**.
 
 ---
 
-## 📘 Query Syntax (CRUD in Structured JSON Form)
+## QueryResult
 
-This system uses a declarative, JSON-based query language to describe database operations. All CRUD operations (`select`, `insert`, `update`, `delete`) follow a uniform, extensible format. This enables simple as well as complex queries with full control over fields, conditions, and data flow.
+`ResourceFoundation\Dto\QueryResult` provides:
 
-### 🔑 Base Structure
+* `columns`: column metadata (name/type/field/alias/table/sensitive)
+* `rows`: result rows
+* `debugSql`: optional debug SQL
+* `sensitive`: whether the result contains sensitive data
+* `affectedRows`: affected row count for write queries (nullable)
+* `insertId`: insert id for insert queries (nullable)
+
+---
+
+## Query syntax
+
+### Base structure
 
 ```json
-{
-  "type": "select" | "insert" | "update" | "delete",
-  ...
-}
+{ "type": "...", ... }
 ```
 
----
-
-### 🔍 `SELECT`
+### SELECT
 
 ```json
 {
@@ -99,41 +99,6 @@ This system uses a declarative, JSON-based query language to describe database o
     }
   ],
   "from": "git_repository",
-  "where": { ... },
-  "group_by": [ ... ],
-  "order_by": [ ... ]
-}
-```
-
-**Fields:**
-
-* `fields[]`: List of fields with `element` and `alias`.
-* `from`: Starting table of the query.
-* `where`, `group_by`, `order_by`: Optional, similar to SQL.
-
----
-
-### ✏️ `UPDATE`
-
-```json
-{
-  "type": "update",
-  "table": "git_repository",
-  "fields": [
-    {
-      "element": {
-        "type": "fld",
-        "table": "git_branch",
-        "field": "message"
-      },
-      "alias": "last_commit_message"
-    },
-    {
-      "element": "New description",
-      "alias": "description"
-    }
-  ],
-  "from": "git_branch",
   "where": {
     "type": "op",
     "operator": "=",
@@ -141,53 +106,85 @@ This system uses a declarative, JSON-based query language to describe database o
       { "type": "fld", "table": "git_repository", "field": "id" },
       42
     ]
-  }
+  },
+  "order_by": [
+    { "expression": { "type": "fld", "table": "git_repository", "field": "name" }, "direction": "ASC" }
+  ],
+  "limit": 50
 }
 ```
 
-**Notes:**
+### INSERT
 
-* `fields[]`: Specifies which columns (`alias`) in the target table will be updated.
-* `element` can be:
+The current insert compiler supports:
 
-  * a field (`type: "fld"`),
-  * a function expression (`type: "fn"`),
-  * a scalar value (direct).
-* `from`: Optional, e.g. for `UPDATE ... FROM` constructs.
+* `INSERT INTO ... VALUES (...)` via `values`
+* optional explicit `columns`
+* `INSERT INTO ... SELECT ...` via `from`
+* optional `on_duplicate` (MySQL `ON DUPLICATE KEY UPDATE`)
 
----
-
-### ➕ `INSERT`
+**INSERT ... VALUES**
 
 ```json
 {
   "type": "insert",
   "table": "git_repository",
-  "fields": [
+  "values": [
+    { "name": "TestRepo", "description": "demo" }
+  ]
+}
+```
+
+**INSERT ... VALUES with explicit columns and expressions**
+
+```json
+{
+  "type": "insert",
+  "table": "base3system_sysentry",
+  "columns": ["type_id", "uuid"],
+  "values": [
     {
-      "element": "TestRepo",
-      "alias": "name"
-    },
-    {
-      "element": {
-        "type": "fn",
-        "function": "NOW"
-      },
-      "alias": "created_at"
+      "type_id": 12,
+      "uuid": { "type": "fn", "function": "UNHEX", "params": ["5c9fb997cd1f470dda5ed6da129b83d7"] }
     }
   ]
 }
 ```
 
-**Notes:**
+**INSERT ... SELECT**
 
-* Fields define the target columns (`alias`) and their corresponding values (`element`).
-* Order is arbitrary.
-* `element` may be static or dynamic.
+```json
+{
+  "type": "insert",
+  "table": "target_table",
+  "columns": ["col_a", "col_b"],
+  "from": {
+    "type": "select",
+    "fields": [
+      { "element": { "type": "fld", "table": "source_table", "field": "a" }, "alias": "col_a" },
+      { "element": { "type": "fld", "table": "source_table", "field": "b" }, "alias": "col_b" }
+    ],
+    "from": "source_table"
+  }
+}
+```
 
----
+**ON DUPLICATE KEY UPDATE**
 
-### 🗑️ `DELETE`
+```json
+{
+  "type": "insert",
+  "table": "git_repository",
+  "values": [
+    { "id": 42, "name": "TestRepo" }
+  ],
+  "on_duplicate": {
+    "name": "TestRepo"
+  }
+}
+```
+
+### DELETE
 
 ```json
 {
@@ -200,71 +197,49 @@ This system uses a declarative, JSON-based query language to describe database o
       { "type": "fld", "table": "git_repository", "field": "name" },
       "%Archived%"
     ]
-  }
+  },
+  "limit": 1
 }
 ```
 
-**Notes:**
-
-* `table`: Target of the delete operation.
-* `where`: Optional – without condition, all rows will be deleted (use with caution!).
-
----
-
-### 🔬 `element` – Detailed Structure
+### TRANSACTION
 
 ```json
-"element": {
-  "type": "fld" | "fn" | "op",
-  ...
+{
+  "type": "transaction",
+  "queries": [
+    { "type": "insert", "table": "a", "values": [ { "x": 1 } ] },
+    { "type": "insert", "table": "b", "values": [ { "y": 2 } ] }
+  ]
 }
 ```
 
-**Types:**
+Notes:
 
-* `"fld"` – Access to a field: `table`, `field`, optional `tablealias`.
-* `"fn"` – Function call: `function`, `params[]`.
-* `"op"` – Logical or arithmetic operation: `operator`, `params[]`.
-* **Scalars** like `42`, `"Test"`, `true`, `null` are allowed directly.
-
----
-
-### 🧠 Examples for `element`
-
-| Type      | Example (JSON)                                          |
-| --------- | ------------------------------------------------------- |
-| Field     | `{ "type": "fld", "table": "users", "field": "email" }` |
-| Function  | `{ "type": "fn", "function": "NOW" }`                   |
-| Operation | `{ "type": "op", "operator": "+", "params": [1, 2] }`   |
-| Scalar    | `"Hello"`                                               |
+* Subqueries are executed in order.
+* On any error, the transaction is rolled back.
+* Errors are propagated as exceptions.
 
 ---
 
-### 🔄 Advantages of the Structure
+## Exporters
 
-* 🔁 **Uniform**: All CRUD operations use the same `fields[]` structure.
-* 🔄 **Flexible**: `element` can contain arbitrary expressions or values.
-* 🔌 **Extensible**: Later extensions like `upsert`, `merge`, `bulk`, etc. are supported.
-* 🔐 **Clear Separation**: Target (`alias`) and source (`element`) are clearly separated.
-
----
-
-### 📎 Further Notes
-
-* JOINs are generated automatically if table fields are logically connected.
-* Alias conflicts and ambiguities are avoided through clear `table`/`alias` specification.
-* Extensions like `limit`, `offset`, `having` can be easily added.
+| Format     | Class                     | Use Case                                  |
+| ---------- | ------------------------- | ----------------------------------------- |
+| CSV        | `CsvReportExporter`       | Data analysis, Excel import, simple tools |
+| JSON       | `JsonReportExporter`      | APIs, integration, serialization          |
+| HTML       | `HtmlReportExporter`      | Web preview, printing, PDF generation     |
+| HTML-Mail  | `HtmlTableReportExporter` | Email delivery, HTML templates            |
+| Excel-HTML | `ExcelHtmlReportExporter` | Excel download without external libraries |
 
 ---
 
-## Roadmap / Future Ideas
+## Roadmap / ideas
 
 * Export filtering/masking based on sensitivity
-* Integration with BASE3 permission system (role-based filtering)
 * UI-driven schema visualizations (graph-based joins)
-* Custom report definitions with user-specific layouts
-* Caching, indexing, and pagination strategies
-* Automatic column type inference + formatting options
+* Caching and pagination strategies
+* Parameterized statements for write queries (reducing literal quoting)
 
 ---
 

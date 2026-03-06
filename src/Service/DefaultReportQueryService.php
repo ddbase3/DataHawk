@@ -31,38 +31,59 @@ class DefaultReportQueryService implements IQueryService {
 		return $this->schemaProvider->getSchema();
 	}
 
-	/**
-	 * @param string $tableName
-	 * @return TableMetadata|null
-	 */
 	public function getTable(string $tableName): ?TableMetadata {
 		return $this->schemaProvider->getTable($tableName);
 	}
 
 	/**
-	 * @param array $queryJson
-	 * @return QueryResult
 	 * @throws AccessDeniedException
 	 * @throws QueryValidationException
 	 */
 	public function executeQuery(array $queryJson): QueryResult {
-		// 1. Compile query into SQL string and metadata
-		$sqlQuery = $this->querycompiler->compile($queryJson);
-
-		// 2. Run query via IDatabase service
-		try {
-			$this->database->connect();
-			$rows = $this->database->multiQuery($sqlQuery->sql, $sqlQuery->params);
-		} catch (\Throwable $e) {
-			return new QueryResult([], [], $sqlQuery->sql . "\n\n❌ DB Error: " . $e->getMessage());
+		if (($queryJson['type'] ?? null) === 'transaction') {
+			return $this->executeTransaction($queryJson);
 		}
 
-		// 3. Validate integrity unless wildcard mode is active
+		$sqlQuery = $this->querycompiler->compile($queryJson);
+
+		$type = (string)($queryJson['type'] ?? 'select');
+		$isWrite = in_array($type, ['insert', 'update', 'delete', 'create'], true);
+
+		$affectedRows = null;
+		$insertId = null;
+
+		try {
+			$this->database->connect();
+
+			if ($isWrite) {
+				$this->database->nonQuery($sqlQuery->sql);
+
+				if ($this->database->isError()) {
+					throw new \RuntimeException($this->database->errorMessage());
+				}
+
+				$affectedRows = $this->database->affectedRows();
+				if ($type === 'insert') {
+					$insertId = $this->database->insertId();
+				}
+
+				return new QueryResult([], [], $sqlQuery->sql, false, $affectedRows, $insertId);
+			}
+
+			$rows = $this->database->multiQuery($sqlQuery->sql);
+			$affectedRows = $this->database->affectedRows();
+
+		} catch (\Throwable $e) {
+			return new QueryResult([], [], $sqlQuery->sql . "\n\n❌ DB Error: " . $e->getMessage(), false, $affectedRows, $insertId);
+		}
+
+		// Integrity check (only for non-wildcard SELECT)
 		if (count($rows) && empty($sqlQuery->isWildcardQuery)) {
 			$compiledFields = $sqlQuery->fields;
 			$firstRow = $rows[0] ?? [];
 			$expectedKeys = array_map(fn($f) => $f['alias'] ?? $f['name'], $compiledFields);
 			$actualKeys = array_keys($firstRow);
+
 			if (count($expectedKeys) !== count($actualKeys) || array_diff($expectedKeys, $actualKeys)) {
 				throw new \RuntimeException(
 					"Query result column mismatch: expected [" . implode(', ', $expectedKeys) .
@@ -71,7 +92,6 @@ class DefaultReportQueryService implements IQueryService {
 			}
 		}
 
-		// 4. Build columns using aliases from compiled fields
 		$columns = [];
 		$firstRow = $rows[0] ?? [];
 		$compiledFields = $sqlQuery->fields;
@@ -79,11 +99,11 @@ class DefaultReportQueryService implements IQueryService {
 		foreach (array_keys($firstRow) as $i => $colName) {
 			$field = $compiledFields[$i] ?? null;
 			$name = $field['alias'] ?? $field['name'] ?? $colName;
-			$type = gettype($firstRow[$colName]);
+			$phpType = gettype($firstRow[$colName]);
 
 			$columns[] = [
 				'name' => $name,
-				'type' => $type,
+				'type' => $phpType,
 				'field' => $field['name'] ?? null,
 				'alias' => $field['alias'] ?? null,
 				'table' => $field['table'] ?? null,
@@ -93,30 +113,74 @@ class DefaultReportQueryService implements IQueryService {
 
 		$isSensitive = in_array(true, array_column($columns, 'sensitive'), true);
 
-		return new QueryResult($columns, $rows, $sqlQuery->sql, $isSensitive);
+		return new QueryResult($columns, $rows, $sqlQuery->sql, $isSensitive, $affectedRows, $insertId);
 	}
 
-	/**
-	 * @return string[]
-	 */
+	private function executeTransaction(array $queryJson): QueryResult {
+		$queries = $queryJson['queries'] ?? null;
+		if (!is_array($queries) || empty($queries)) {
+			throw new QueryValidationException("Transaction query requires a non-empty 'queries' array.");
+		}
+
+		$this->database->connect();
+		$this->database->beginTransaction();
+
+		$lastResult = null;
+		$totalAffected = 0;
+		$lastInsertId = null;
+
+		try {
+			foreach ($queries as $subQuery) {
+				if (!is_array($subQuery) || empty($subQuery['type'])) {
+					throw new QueryValidationException("Each transaction subquery must be a query array with a 'type'.");
+				}
+
+				$result = $this->executeQuery($subQuery);
+
+				$debugSql = $result->debugSql ?? '';
+				if ($debugSql !== '' && str_contains($debugSql, '❌ DB Error:')) {
+					throw new \RuntimeException("Transaction subquery failed:\n" . $debugSql);
+				}
+
+				$lastResult = $result;
+
+				if (is_int($result->affectedRows)) {
+					$totalAffected += $result->affectedRows;
+				}
+
+				if (($subQuery['type'] ?? null) === 'insert' && $result->insertId !== null) {
+					$lastInsertId = $result->insertId;
+				}
+			}
+
+			$this->database->commit();
+		} catch (\Throwable $e) {
+			$this->database->rollback();
+			throw $e;
+		}
+
+		if ($lastResult === null) {
+			return new QueryResult([], [], null, false, 0, null);
+		}
+
+		$lastResult->affectedRows = $totalAffected;
+		$lastResult->insertId = $lastInsertId;
+
+		return $lastResult;
+	}
+
 	public function listDomains(): array {
 		$tables = $this->schemaProvider->getSchema();
 		$domains = array_map(fn(TableMetadata $t) => $t->domain ?? '', $tables);
 		return array_values(array_unique(array_filter($domains)));
 	}
 
-	/**
-	 * @return string[]
-	 */
 	public function listCategories(): array {
 		$tables = $this->schemaProvider->getSchema();
 		$categories = array_map(fn(TableMetadata $t) => $t->category ?? '', $tables);
 		return array_values(array_unique(array_filter($categories)));
 	}
 
-	/**
-	 * @return string[]
-	 */
 	public function listTags(): array {
 		$tables = $this->schemaProvider->getSchema();
 		$allTags = [];
@@ -131,4 +195,3 @@ class DefaultReportQueryService implements IQueryService {
 		return array_values(array_unique(array_filter($allTags)));
 	}
 }
-
