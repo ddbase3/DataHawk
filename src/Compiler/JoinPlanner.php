@@ -93,6 +93,8 @@ class JoinPlanner {
 	 * Fixes:
 	 * - Global join deduplication (no duplicate JOINs across multiple join requests / overlapping paths)
 	 * - Correct join field quoting: alias is applied to the correct side (table being joined)
+	 * - Prefer direct joins over indirect graph paths
+	 * - Prefer shorter paths over longer ones to avoid unrelated detours through metadata tables
 	 */
 	public function compileJoins(string $from, array $joinRequests): string {
 		$sql = '';
@@ -105,24 +107,10 @@ class JoinPlanner {
 		foreach ($joinRequests as $target => $variant) {
 			if ($target === $from) continue;
 
-			$paths = $this->joinGraph->findAllPaths($from, $target);
-			if (empty($paths)) {
-				throw new QueryValidationException("No join path from '$from' to '$target'");
-			}
+			$path = $this->resolveJoinPath($from, $target);
+			$lastStepIndex = array_key_last($path);
 
-			// Prefer a "default" path if available
-			$path = null;
-			foreach ($paths as $candidate) {
-				if (!empty($candidate[0]['meta']['default'])) {
-					$path = $candidate;
-					break;
-				}
-			}
-			if (!$path) $path = $paths[0];
-
-			$lastStep = $path[array_key_last($path)];
-
-			foreach ($path as $step) {
+			foreach ($path as $stepIndex => $step) {
 				$table = $step['to'];
 
 				// Use all aliases that are actually referenced for this table; if none, fall back to the table name.
@@ -137,7 +125,7 @@ class JoinPlanner {
 
 					$isDefault = (bool)($step['meta']['default'] ?? false);
 					$stepType = strtoupper((string)($step['meta']['type'] ?? 'INNER'));
-					$isLastStep = ($step === $lastStep);
+					$isLastStep = ($stepIndex === $lastStepIndex);
 
 					// Determine join type (default join type can come from schema meta; variant may override on last step).
 					$useLeft = ($isLastStep && $variant && strtoupper((string)$variant) === 'OPTIONAL')
@@ -161,6 +149,62 @@ class JoinPlanner {
 		}
 
 		return $sql;
+	}
+
+	/**
+	 * Resolves the best join path from $from to $target.
+	 *
+	 * Strategy:
+	 * - Prefer a direct edge if available
+	 * - Otherwise prefer the shortest path
+	 * - If multiple paths have the same length, prefer the one with more default-marked steps
+	 */
+	private function resolveJoinPath(string $from, string $target): array {
+		$directEdge = $this->joinGraph->getDefaultEdge($from, $target);
+		if ($directEdge !== null) {
+			return [[
+				'from' => $from,
+				'to' => $directEdge['to'],
+				'label' => $directEdge['label'],
+				'meta' => $directEdge['meta'],
+			]];
+		}
+
+		$paths = $this->joinGraph->findAllPaths($from, $target);
+		if (empty($paths)) {
+			throw new QueryValidationException("No join path from '$from' to '$target'");
+		}
+
+		usort($paths, function(array $a, array $b): int {
+			$lengthCompare = count($a) <=> count($b);
+			if ($lengthCompare !== 0) {
+				return $lengthCompare;
+			}
+
+			$defaultCompare = $this->countDefaultSteps($b) <=> $this->countDefaultSteps($a);
+			if ($defaultCompare !== 0) {
+				return $defaultCompare;
+			}
+
+			return 0;
+		});
+
+		return $paths[0];
+	}
+
+	/**
+	 * Counts how many steps in a path are marked as default.
+	 */
+	private function countDefaultSteps(array $path): int {
+		$count = 0;
+
+		foreach ($path as $step) {
+			if (!empty($step['meta']['default'])) {
+				$count++;
+			}
+		}
+
+		return $count;
 	}
 
 	/**
