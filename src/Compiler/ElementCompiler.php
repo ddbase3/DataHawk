@@ -24,7 +24,7 @@ class ElementCompiler {
 
 	public function __construct(
 		private AliasResolver $aliasResolver,
-		private object $compiler	// recursive access for subqueries
+		private object $compiler        // recursive access for subqueries
 	) {}
 
 	public function compileElement(mixed $element): string {
@@ -186,15 +186,35 @@ class ElementCompiler {
 				$this->compileElement($params[2]),
 
 			'IN', 'NOT IN' =>
-				$this->compileElement($params[0]) . ' ' . $opName . ' (' .
-				implode(', ', array_map(fn($p) => $this->compileElement($p), array_slice($params, 1))) . ')',
+				$this->compileInOperation($opName, $params),
 
 			'EXISTS', 'NOT EXISTS' =>
-				$opName . ' (' . $this->compileElement($params[0]) . ')',
+				$opName . ' ' . $this->compileElement($params[0]),
 
 			default =>
 				'(' . implode(' ' . $op['operator'] . ' ', array_map(fn($p) => $this->compileElement($p), $params)) . ')'
 		};
+	}
+
+	private function compileInOperation(string $operator, array $params): string {
+		if (count($params) < 2) {
+			throw new QueryValidationException($operator . " expects at least 2 parameters.");
+		}
+
+		$left = $this->compileElement($params[0]);
+		$rightParams = array_slice($params, 1);
+
+		if (
+			count($rightParams) === 1
+			&& is_array($rightParams[0])
+			&& ($rightParams[0]['type'] ?? null) === 'subquery'
+		) {
+			return $left . ' ' . $operator . ' ' . $this->compileElement($rightParams[0]);
+		}
+
+		return $left . ' ' . $operator . ' (' .
+			implode(', ', array_map(fn($p) => $this->compileElement($p), $rightParams)) .
+			')';
 	}
 
 	private function compileSubquery(array $sub): string {
@@ -240,4 +260,3 @@ class ElementCompiler {
 			: "'" . str_replace("'", "''", (string)$value) . "'";
 	}
 }
-
