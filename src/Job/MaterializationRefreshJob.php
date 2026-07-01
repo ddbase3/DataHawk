@@ -21,49 +21,28 @@ namespace DataHawk\Job;
 use Base3\Api\IContainer;
 use Base3\Configuration\Api\IConfiguration;
 use Base3\State\Api\IStateStore;
-use Base3\Worker\Api\IPolicyControlledJob;
-use Base3\Worker\Policy\PolicyControlledJobTrait;
+use Base3\Worker\Api\IJob;
+use DataHawk\Materialization\MaterializationRefreshPlanner;
 use ResourceFoundation\Api\IMaterializationManifestProvider;
+use ResourceFoundation\Api\IMaterializationRegistry;
 use ResourceFoundation\Api\IMaterializationService;
-use ResourceFoundation\Dto\MaterializationManifest;
 use ResourceFoundation\Dto\MaterializationRunResult;
 use Throwable;
 
 /**
  * MaterializationRefreshJob
  *
- * Refreshes DataHawk materialization manifests.
+ * Lightweight always-run materialization worker.
  *
- * Scheduling:
- * - Controlled by DailyWindowJobPolicy.
- * - Defaults to 02:00-04:00.
- *
- * Configuration:
- * - job.datahawkmaterializationrefreshjob.active = 1 enables the job.
- * - job.datahawkmaterializationrefreshjob.priority controls worker priority.
- * - job.datahawkmaterializationrefreshjob.from / .to control the daily window.
- * - job.datahawkmaterializationrefreshjob.manifest limits the run to one manifest.
- * - job.datahawkmaterializationrefreshjob.manifests limits the run to multiple manifests.
- * - job.datahawkmaterializationrefreshjob.mode can be refresh, full, or incremental.
- *
- * Runtime state overrides:
- * - datahawk.job.materializationrefresh.manifest
- * - datahawk.job.materializationrefresh.manifests
- * - datahawk.job.materializationrefresh.mode
- *
- * Behavior:
- * - If materialization services are not wired, the job skips safely.
- * - Manifest dependencies are refreshed before dependent manifests.
+ * The job itself has no worker timing policy. It is expected to be called often
+ * by the normal worker loop. Every materialization manifest decides through its
+ * own refresh.schedule whether it is currently due.
  */
-final class MaterializationRefreshJob implements IPolicyControlledJob {
-
-	use PolicyControlledJobTrait;
+final class MaterializationRefreshJob implements IJob {
 
 	private const STATE_PREFIX = 'datahawk.job.materializationrefresh.';
 
 	private const DEFAULT_PRIORITY = 1;
-	private const DEFAULT_WINDOW_FROM = '02:00';
-	private const DEFAULT_WINDOW_TO = '04:00';
 
 	private ?array $jobConf = null;
 
@@ -86,18 +65,6 @@ final class MaterializationRefreshJob implements IPolicyControlledJob {
 		return (int)($conf['datahawkmaterializationrefreshjob.priority'] ?? self::DEFAULT_PRIORITY);
 	}
 
-	public function getPolicyDefinition(): array {
-		$conf = $this->getJobConf();
-
-		return [
-			'policy' => 'dailywindowjobpolicy',
-			'data' => [
-				'from' => (string)($conf['datahawkmaterializationrefreshjob.from'] ?? self::DEFAULT_WINDOW_FROM),
-				'to' => (string)($conf['datahawkmaterializationrefreshjob.to'] ?? self::DEFAULT_WINDOW_TO)
-			]
-		];
-	}
-
 	public function go() {
 		$manifestProvider = $this->getManifestProvider();
 		if ($manifestProvider === null) {
@@ -109,35 +76,63 @@ final class MaterializationRefreshJob implements IPolicyControlledJob {
 			return 'Skip (materialization service is not wired)';
 		}
 
+		$registry = $this->getMaterializationRegistry();
+		if ($registry === null) {
+			return 'Skip (materialization registry is not wired)';
+		}
+
 		$stateStore = $this->getStateStore();
+		if ($stateStore === null) {
+			return 'Skip (state store is not wired; manifest scheduling requires IStateStore)';
+		}
+
+		$planner = new MaterializationRefreshPlanner($manifestProvider, $registry, $stateStore);
+		$mode = $this->getRefreshMode($stateStore);
+		$force = $this->isForced($stateStore);
 
 		try {
-			$manifestIds = $this->getOrderedManifestIds($manifestProvider, $stateStore);
+			$manifestIds = $planner->getManifestIdsToRefresh($this->getConfiguredManifestIds($stateStore), $force);
 		} catch (Throwable $e) {
 			return 'Materialization refresh failed before execution: ' . $e->getMessage();
 		}
 
 		if ($manifestIds === []) {
-			return 'Skip (no materialization manifests configured)';
+			return 'Skip (no materializations due)';
 		}
 
-		$mode = $this->getRefreshMode($stateStore);
 		$results = [];
 
 		foreach ($manifestIds as $manifestId) {
-			$results[] = $this->refreshManifest($service, $manifestId, $mode);
+			$manifest = $planner->getManifest($manifestId);
+			if ($manifest === null) {
+				$results[] = new MaterializationRunResult(
+					manifestId: $manifestId,
+					success: false,
+					message: 'Unknown materialization manifest: ' . $manifestId
+				);
+				continue;
+			}
+
+			$planner->markAttempt($manifest);
+			$result = $this->refreshManifest($service, $manifestId, $mode);
+			$planner->markResult($manifest, $result);
+			$results[] = $result;
 		}
+
+		$planner->flushState();
+		$this->clearForceState($stateStore);
 
 		$failed = array_values(array_filter($results, fn(MaterializationRunResult $result) => !$result->success));
 		$successCount = count($results) - count($failed);
+		$dueText = implode(',', $manifestIds);
+		$forceText = $force ? ', force: 1' : '';
 
 		if ($failed === []) {
-			$this->markRun();
-			return 'Materialization refresh done (' . $successCount . '/' . count($results) . ' succeeded, mode: ' . $mode . ')';
+			return 'Materialization refresh done (' . $successCount . '/' . count($results) . ' succeeded, mode: ' . $mode . ', due: ' . $dueText . $forceText . ')';
 		}
 
 		return 'Materialization refresh finished with failures ('
-			. $successCount . '/' . count($results) . ' succeeded, mode: ' . $mode . '): '
+			. $successCount . '/' . count($results) . ' succeeded, mode: ' . $mode . ', due: ' . $dueText . $forceText . '): '
 			. $this->formatFailures($failed);
 	}
 
@@ -167,6 +162,15 @@ final class MaterializationRefreshJob implements IPolicyControlledJob {
 		return $provider instanceof IMaterializationManifestProvider ? $provider : null;
 	}
 
+	private function getMaterializationRegistry(): ?IMaterializationRegistry {
+		if (!$this->container->has(IMaterializationRegistry::class)) {
+			return null;
+		}
+
+		$registry = $this->container->get(IMaterializationRegistry::class);
+		return $registry instanceof IMaterializationRegistry ? $registry : null;
+	}
+
 	private function getStateStore(): ?IStateStore {
 		if (!$this->container->has(IStateStore::class)) {
 			return null;
@@ -176,32 +180,22 @@ final class MaterializationRefreshJob implements IPolicyControlledJob {
 		return $stateStore instanceof IStateStore ? $stateStore : null;
 	}
 
-	/**
-	 * @return string[]
-	 */
-	private function getOrderedManifestIds(IMaterializationManifestProvider $manifestProvider, ?IStateStore $stateStore): array {
-		$manifests = $this->getManifestMap($manifestProvider);
-		$manifestIds = $this->getConfiguredManifestIds($stateStore);
-
-		if ($manifestIds === []) {
-			$manifestIds = array_keys($manifests);
-		}
-
-		$expandedIds = $this->expandManifestIdsWithDependencies($manifestIds, $manifests);
-
-		return $this->sortManifestIdsByDependencies($expandedIds, $manifests);
+	private function getRefreshMode(?IStateStore $stateStore): string {
+		$mode = strtolower(trim((string)$this->readStateOrConfig($stateStore, 'mode', 'refresh')));
+		return in_array($mode, ['refresh', 'full', 'incremental'], true) ? $mode : 'refresh';
 	}
 
-	/**
-	 * @return array<string, MaterializationManifest>
-	 */
-	private function getManifestMap(IMaterializationManifestProvider $manifestProvider): array {
-		$manifests = [];
-		foreach ($manifestProvider->getManifests() as $manifest) {
-			$manifests[$manifest->id] = $manifest;
+	private function isForced(?IStateStore $stateStore): bool {
+		$value = $this->readStateOrConfig($stateStore, 'force', 0);
+		if (is_bool($value)) {
+			return $value;
 		}
 
-		return $manifests;
+		if (is_numeric($value)) {
+			return (int)$value === 1;
+		}
+
+		return in_array(strtolower(trim((string)$value)), ['1', 'true', 'yes', 'on'], true);
 	}
 
 	/**
@@ -216,112 +210,20 @@ final class MaterializationRefreshJob implements IPolicyControlledJob {
 		return $this->normalizeManifestIds($configured);
 	}
 
-	/**
-	 * @param string[] $manifestIds
-	 * @param array<string, MaterializationManifest> $manifests
-	 * @return string[]
-	 */
-	private function expandManifestIdsWithDependencies(array $manifestIds, array $manifests): array {
-		$result = [];
-		$seen = [];
-
-		foreach ($manifestIds as $manifestId) {
-			$this->addManifestWithDependencies($manifestId, $manifests, $result, $seen);
-		}
-
-		return $result;
-	}
-
-	/**
-	 * @param array<string, MaterializationManifest> $manifests
-	 * @param string[] $result
-	 * @param array<string, bool> $seen
-	 */
-	private function addManifestWithDependencies(string $manifestId, array $manifests, array &$result, array &$seen): void {
-		if (isset($seen[$manifestId])) {
-			return;
-		}
-
-		$seen[$manifestId] = true;
-		$manifest = $manifests[$manifestId] ?? null;
-
-		if ($manifest !== null) {
-			foreach ($manifest->dependsOn as $dependency) {
-				$this->addManifestWithDependencies($dependency, $manifests, $result, $seen);
-			}
-		}
-
-		$result[] = $manifestId;
-	}
-
-	/**
-	 * @param string[] $manifestIds
-	 * @param array<string, MaterializationManifest> $manifests
-	 * @return string[]
-	 */
-	private function sortManifestIdsByDependencies(array $manifestIds, array $manifests): array {
-		$wanted = array_fill_keys($manifestIds, true);
-		$result = [];
-		$visited = [];
-		$visiting = [];
-
-		foreach ($manifestIds as $manifestId) {
-			$this->visitManifest($manifestId, $wanted, $manifests, $visited, $visiting, $result);
-		}
-
-		return $result;
-	}
-
-	/**
-	 * @param array<string, bool> $wanted
-	 * @param array<string, MaterializationManifest> $manifests
-	 * @param array<string, bool> $visited
-	 * @param array<string, bool> $visiting
-	 * @param string[] $result
-	 */
-	private function visitManifest(
-		string $manifestId,
-		array $wanted,
-		array $manifests,
-		array &$visited,
-		array &$visiting,
-		array &$result
-	): void {
-		if (isset($visited[$manifestId])) {
-			return;
-		}
-
-		if (isset($visiting[$manifestId])) {
-			throw new \RuntimeException('Circular materialization dependency detected at manifest: ' . $manifestId);
-		}
-
-		$visiting[$manifestId] = true;
-		$manifest = $manifests[$manifestId] ?? null;
-
-		if ($manifest !== null) {
-			foreach ($manifest->dependsOn as $dependency) {
-				if (isset($wanted[$dependency])) {
-					$this->visitManifest($dependency, $wanted, $manifests, $visited, $visiting, $result);
-				}
-			}
-		}
-
-		unset($visiting[$manifestId]);
-		$visited[$manifestId] = true;
-		$result[] = $manifestId;
-	}
-
-	private function getRefreshMode(?IStateStore $stateStore): string {
-		$mode = strtolower(trim((string)$this->readStateOrConfig($stateStore, 'mode', 'refresh')));
-		return in_array($mode, ['refresh', 'full', 'incremental'], true) ? $mode : 'refresh';
-	}
-
 	private function refreshManifest(IMaterializationService $service, string $manifestId, string $mode): MaterializationRunResult {
-		return match ($mode) {
-			'full' => $service->buildFull($manifestId),
-			'incremental' => $service->buildIncremental($manifestId),
-			default => $service->refresh($manifestId)
-		};
+		try {
+			return match ($mode) {
+				'full' => $service->buildFull($manifestId),
+				'incremental' => $service->buildIncremental($manifestId),
+				default => $service->refresh($manifestId)
+			};
+		} catch (Throwable $e) {
+			return new MaterializationRunResult(
+				manifestId: $manifestId,
+				success: false,
+				message: $e->getMessage()
+			);
+		}
 	}
 
 	private function readStateOrConfig(?IStateStore $stateStore, string $key, mixed $default): mixed {
@@ -374,6 +276,13 @@ final class MaterializationRefreshJob implements IPolicyControlledJob {
 		}
 
 		return implode(' | ', $messages);
+	}
+
+	private function clearForceState(IStateStore $stateStore): void {
+		if ($stateStore->has($this->stateKey('force'))) {
+			$stateStore->delete($this->stateKey('force'));
+			$stateStore->flush();
+		}
 	}
 
 	private function stateKey(string $suffix): string {
