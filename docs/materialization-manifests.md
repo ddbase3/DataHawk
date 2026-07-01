@@ -85,3 +85,28 @@ Indexes can be expressed as objects:
 ```
 
 or, for simple non-unique indexes, as column arrays.
+
+## Raw SELECT materializations
+
+Most materializations should use structured DataHawk query JSON. For complex reporting shapes that are not expressible as a simple graph query, a manifest may define a raw SELECT query:
+
+```json
+{
+	"query": {
+		"type": "raw_select",
+		"sql": "SELECT ..."
+	}
+}
+```
+
+The materialization service still creates the target table from `columns`, creates indexes from `indexes`, counts rows and publishes the generation through the registry. Only the source SELECT is raw SQL.
+
+Raw SELECT SQL may reference currently published materialized tables with placeholders:
+
+```sql
+{{table:ilias_materialized.course_report_rows}}
+```
+
+At build time the placeholder is replaced by the current physical `base3_mat_*` table from the materialization registry. If no current generation is published, the build fails.
+
+Use raw SELECTs sparingly. They are intended for report shapes such as recursive OrgUnit rollups where the source calculation is naturally SQL-specific.

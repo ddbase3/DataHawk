@@ -54,10 +54,10 @@ class DefaultMaterializationService implements IMaterializationService {
 
 		try {
 			$this->executeChecked($this->createTableQuery($manifest, $physicalTable));
-			$insertResult = $this->executeChecked($this->createInsertQuery($manifest, $physicalTable));
+			$fallbackAffectedRows = $this->executeInsert($manifest, $physicalTable);
 			$this->createIndexes($manifest, $physicalTable);
 
-			$rowCount = $this->countRows($physicalTable, $insertResult->affectedRows);
+			$rowCount = $this->countRows($physicalTable, $fallbackAffectedRows);
 			$publishedGeneration = new MaterializationGeneration(
 				schema: $manifest->targetSchema,
 				logicalTable: $manifest->logicalTable,
@@ -252,6 +252,16 @@ class DefaultMaterializationService implements IMaterializationService {
 		};
 	}
 
+	private function executeInsert(MaterializationManifest $manifest, string $physicalTable): int {
+		if ($this->isRawSelectManifest($manifest)) {
+			$this->executeRawSelectInsert($manifest, $physicalTable);
+			return 0;
+		}
+
+		$insertResult = $this->executeChecked($this->createInsertQuery($manifest, $physicalTable));
+		return $insertResult->affectedRows ?? 0;
+	}
+
 	private function createInsertQuery(MaterializationManifest $manifest, string $physicalTable): array {
 		$sourceQuery = $manifest->query;
 		$sourceQuery['type'] = $sourceQuery['type'] ?? 'select';
@@ -266,6 +276,55 @@ class DefaultMaterializationService implements IMaterializationService {
 			'columns' => $this->getColumnNames($manifest),
 			'from' => $sourceQuery
 		];
+	}
+
+	private function isRawSelectManifest(MaterializationManifest $manifest): bool {
+		$type = strtolower((string)($manifest->query['type'] ?? ''));
+		return $type === 'raw_select' || $type === 'raw-sql-select';
+	}
+
+	private function executeRawSelectInsert(MaterializationManifest $manifest, string $physicalTable): void {
+		if ($this->database === null) {
+			throw new MaterializationException('Raw materialization queries require an IDatabase instance.');
+		}
+
+		$sql = trim((string)($manifest->query['sql'] ?? ''));
+		if ($sql === '') {
+			throw new MaterializationException('Raw materialization query must define a non-empty sql value.');
+		}
+
+		$sql = $this->resolveRawSelectSql($manifest, $sql);
+		$columns = array_map(fn(string $column) => $this->quoteIdentifier($column), $this->getColumnNames($manifest));
+
+		$this->assertSafePhysicalTable($physicalTable);
+		$this->database->nonQuery(
+			'INSERT INTO ' . $this->quoteIdentifier($physicalTable) .
+			' (' . implode(', ', $columns) . ') ' . $sql
+		);
+	}
+
+	private function resolveRawSelectSql(MaterializationManifest $manifest, string $sql): string {
+		return preg_replace_callback(
+			'/\{\{table:([a-zA-Z0-9_]+)(?:\.([a-zA-Z0-9_]+))?\}\}/',
+			function(array $matches) use ($manifest): string {
+				if (isset($matches[2]) && $matches[2] !== '') {
+					$schema = (string)$matches[1];
+					$logicalTable = (string)$matches[2];
+				} else {
+					$schema = $manifest->sourceSchema !== '' ? $manifest->sourceSchema : $manifest->targetSchema;
+					$logicalTable = (string)$matches[1];
+				}
+
+				$current = $this->registry->getCurrentGeneration($schema, $logicalTable);
+				if ($current === null) {
+					throw new MaterializationException('Raw materialization query references unpublished table: ' . $schema . '.' . $logicalTable);
+				}
+
+				$this->assertSafePhysicalTable($current->physicalTable);
+				return $this->quoteIdentifier($current->physicalTable);
+			},
+			$sql
+		) ?? $sql;
 	}
 
 	private function getColumnNames(MaterializationManifest $manifest): array {
