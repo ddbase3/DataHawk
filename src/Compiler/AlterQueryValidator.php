@@ -47,6 +47,19 @@ class AlterQueryValidator implements IReportQueryValidator {
 			$act = strtolower($action['action']);
 
 			switch ($act) {
+				case 'add_index':
+				case 'add_unique_index':
+					if (empty($action['name']) || empty($action['columns']) || !is_array($action['columns'])) {
+						throw new QueryValidationException("Action #$i ($act) requires 'name' and non-empty 'columns'.");
+					}
+					break;
+
+				case 'drop_index':
+					if (empty($action['name'])) {
+						throw new QueryValidationException("Action #$i ($act) requires 'name'.");
+					}
+					break;
+
 				case 'add_column':
 				case 'modify_column':
 					if (empty($action['name']) || empty($action['type'])) {

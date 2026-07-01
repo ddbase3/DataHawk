@@ -20,6 +20,7 @@ namespace DataHawk\Compiler;
 
 use DataHawk\Api\IReportQueryTypeCompiler;
 use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Api\ITableNameResolver;
 use ResourceFoundation\Exception\QueryValidationException;
 
 /**
@@ -33,10 +34,11 @@ class QueryCompilerFactory {
 
 	public function __construct(
 		IQuerySchemaProvider $schemaProvider,
-		MysqlReportQueryCompiler $mainCompiler
+		MysqlReportQueryCompiler $mainCompiler,
+		?ITableNameResolver $tableNameResolver = null
 	) {
 		$this->compilers = [
-			'select'   => new SelectQueryCompiler($schemaProvider),
+			'select'   => new SelectQueryCompiler($schemaProvider, $tableNameResolver),
 			'insert'   => new InsertQueryCompiler($schemaProvider, $mainCompiler),
 			'update'   => new UpdateQueryCompiler($schemaProvider),
 			'delete'   => new DeleteQueryCompiler($schemaProvider),

@@ -22,6 +22,7 @@ use DataHawk\Api\IReportQueryValidator;
 use DataHawk\Api\IReportQueryTypeCompiler;
 use ResourceFoundation\Api\IQueryCompiler;
 use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Api\ITableNameResolver;
 use ResourceFoundation\Dto\QueryStatement;
 use ResourceFoundation\Exception\QueryValidationException;
 
@@ -35,9 +36,12 @@ class MysqlReportQueryCompiler implements IQueryCompiler {
 	private QueryValidatorFactory $validatorFactory;
 	private QueryCompilerFactory $compilerFactory;
 
-	public function __construct(private IQuerySchemaProvider $schemaProvider) {
+	public function __construct(
+		private IQuerySchemaProvider $schemaProvider,
+		private ?ITableNameResolver $tableNameResolver = null
+	) {
 		$this->validatorFactory = new QueryValidatorFactory();
-		$this->compilerFactory = new QueryCompilerFactory($schemaProvider, $this);
+		$this->compilerFactory = new QueryCompilerFactory($schemaProvider, $this, $tableNameResolver);
 	}
 
 	/**

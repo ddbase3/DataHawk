@@ -63,7 +63,7 @@ class DefaultReportQueryService implements IQueryService {
 		$sqlQuery = $this->querycompiler->compile($queryJson);
 
 		$type = (string)($queryJson['type'] ?? 'select');
-		$isWrite = in_array($type, ['insert', 'update', 'delete', 'create'], true);
+		$isWrite = $this->isWriteQueryType($type);
 
 		$affectedRows = null;
 		$insertId = null;
@@ -130,6 +130,19 @@ class DefaultReportQueryService implements IQueryService {
 		$isSensitive = in_array(true, array_column($columns, 'sensitive'), true);
 
 		return new QueryResult($columns, $rows, $sqlQuery->sql, $isSensitive, $affectedRows, $insertId);
+	}
+
+	private function isWriteQueryType(string $type): bool {
+		return in_array($type, [
+			'insert',
+			'update',
+			'delete',
+			'create',
+			'alter',
+			'drop',
+			'rename',
+			'truncate'
+		], true);
 	}
 
 	private function executeTransaction(array $queryJson): QueryResult {

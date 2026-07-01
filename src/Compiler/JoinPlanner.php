@@ -19,6 +19,8 @@
 namespace DataHawk\Compiler;
 
 use DataHawk\Util\Graph;
+use ResourceFoundation\Api\ITableNameResolver;
+use ResourceFoundation\Dto\TableNameResolutionContext;
 use ResourceFoundation\Exception\QueryValidationException;
 
 class JoinPlanner {
@@ -28,7 +30,8 @@ class JoinPlanner {
 	public function __construct(
 		private AliasResolver $aliasResolver,
 		private ElementCompiler $elementCompiler,
-		Graph $joinGraph
+		Graph $joinGraph,
+		private ?ITableNameResolver $tableNameResolver = null
 	) {
 		$this->joinGraph = $joinGraph;
 	}
@@ -139,7 +142,7 @@ class JoinPlanner {
 	 * - Self joins are planned through already joined intermediate alias nodes.
 	 * - No new query API is introduced.
 	 */
-	public function compileJoins(string $from, array $joinRequests): string {
+	public function compileJoins(string $from, array $joinRequests, ?string $fromAlias = null, string $schema = ''): string {
 		$sql = '';
 		$joinRequests = $this->normalizeJoinRequests($joinRequests);
 
@@ -150,10 +153,11 @@ class JoinPlanner {
 			$joined,
 			$aliasStates,
 			$from,
-			$from,
+			$fromAlias ?? $from,
 			null,
 			null
 		);
+
 
 		$normalRequests = [];
 		$selfJoinRequests = [];
@@ -162,7 +166,7 @@ class JoinPlanner {
 			$table = $joinRequest['table'];
 			$alias = $joinRequest['alias'];
 
-			if ($table === $from && $alias === $from) {
+			if ($table === $from && $alias === ($fromAlias ?? $from)) {
 				continue;
 			}
 
@@ -182,7 +186,7 @@ class JoinPlanner {
 		 */
 		foreach ($normalRequests as $joinRequest) {
 			$path = $this->resolveJoinPath($from, $joinRequest['table']);
-			$sql .= $this->compileJoinPath($path, $from, $joinRequest, $joinRequests, $joined, $aliasStates);
+			$sql .= $this->compileJoinPath($path, $fromAlias ?? $from, $joinRequest, $joinRequests, $joined, $aliasStates, $schema);
 		}
 
 		/*
@@ -202,7 +206,8 @@ class JoinPlanner {
 				$joinRequest,
 				$joinRequests,
 				$joined,
-				$aliasStates
+				$aliasStates,
+				$schema
 			);
 		}
 
@@ -252,7 +257,8 @@ class JoinPlanner {
 		array $joinRequest,
 		array $allJoinRequests,
 		array &$joined,
-		array &$aliasStates
+		array &$aliasStates,
+		string $schema = ''
 	): string {
 		$sql = '';
 		$currentAlias = $startAlias;
@@ -296,8 +302,9 @@ class JoinPlanner {
 					. $this->quoteJoinField($right, $step['from'], $currentAlias, $step['to'], $alias);
 			}
 
-			$sql .= " $joinType " . $this->elementCompiler->quoteIdentifier($table);
-			if ($alias !== $table) {
+			$resolvedTableName = $this->resolveTableName($table, $alias, 'select.join', $schema);
+			$sql .= " $joinType " . $this->elementCompiler->quoteIdentifier($resolvedTableName);
+			if ($alias !== $table || $resolvedTableName !== $table) {
 				$sql .= " AS " . $this->elementCompiler->quoteIdentifier($alias);
 			}
 			$sql .= " ON " . implode(" AND ", $onParts);
@@ -568,6 +575,17 @@ class JoinPlanner {
 	 * That makes alias handling explicit and prevents accidental reuse of the
 	 * plain table name when a table is joined multiple times.
 	 */
+	private function resolveTableName(string $tableName, ?string $alias, string $operation, string $schema = ''): string {
+		return $this->tableNameResolver?->resolveTableName(
+			$tableName,
+			new TableNameResolutionContext(
+				schema: $schema,
+				alias: $alias,
+				operation: $operation
+			)
+		) ?? $tableName;
+	}
+
 	private function quoteJoinField(
 		string $ref,
 		string $fromTable,

@@ -34,6 +34,26 @@ class AlterQueryCompiler implements IReportQueryTypeCompiler {
 			$cmd = strtoupper($action['action']);
 
 			switch ($cmd) {
+				case 'ADD_INDEX': {
+					$name = $this->quoteIdentifier($action['name']);
+					$columns = $this->quoteIdentifierList($action['columns'] ?? []);
+					$actions[] = "ADD INDEX $name ($columns)";
+					break;
+				}
+
+				case 'ADD_UNIQUE_INDEX': {
+					$name = $this->quoteIdentifier($action['name']);
+					$columns = $this->quoteIdentifierList($action['columns'] ?? []);
+					$actions[] = "ADD UNIQUE INDEX $name ($columns)";
+					break;
+				}
+
+				case 'DROP_INDEX': {
+					$name = $this->quoteIdentifier($action['name']);
+					$actions[] = "DROP INDEX $name";
+					break;
+				}
+
 				case 'ADD_COLUMN': {
 					$col = $this->quoteIdentifier($action['name']);
 					$type = $action['type'];
@@ -86,6 +106,14 @@ class AlterQueryCompiler implements IReportQueryTypeCompiler {
 
 	private function quoteIdentifier(string $str): string {
 		return '`' . str_replace('`', '``', $str) . '`';
+	}
+
+	private function quoteIdentifierList(array $columns): string {
+		if ($columns === []) {
+			throw new \InvalidArgumentException('ALTER index action requires at least one column.');
+		}
+
+		return implode(', ', array_map(fn($column) => $this->quoteIdentifier((string)$column), $columns));
 	}
 
 	private function quoteLiteral(string|int|float|bool|null $value): string {
