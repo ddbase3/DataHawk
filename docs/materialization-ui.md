@@ -12,9 +12,11 @@ The reporting administration section can expose these displays:
 | `datahawkmaterializationmanifestdisplay` | Manifest list with schedule, dependency mode, current generation and manual refresh. |
 | `datahawkmaterializationregistrydisplay` | Registry history from `base3_mat_registry`. |
 | `datahawkmaterializationrundisplay` | Recent build runs from `base3_mat_run`. |
-| `datahawkmaterializationtabledisplay` | Generated physical tables matching `base3_mat_%`. |
+| `datahawkmaterializationtabledisplay` | Generated physical materialization tables matching `base3_mat_%`, excluding technical backend tables such as `base3_mat_registry` and `base3_mat_run`. |
 
 All displays use the same MVC template and expose a JSON endpoint through the normal display `out=json` mechanism.
+
+The table overview counts only generated materialization generation tables. Technical backend tables owned by the materialization registry, currently `base3_mat_registry` and `base3_mat_run`, are intentionally excluded from the table count and the table subtab. They remain visible through the registry and run displays.
 
 ## Actions
 

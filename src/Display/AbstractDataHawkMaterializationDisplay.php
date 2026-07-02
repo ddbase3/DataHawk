@@ -38,6 +38,11 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 	private const STATE_PREFIX = 'datahawk.materialization.';
 
+	private const TECHNICAL_TABLES = [
+		'base3_mat_registry',
+		'base3_mat_run',
+	];
+
 	public function __construct(
 		private readonly IContainer $container,
 		private readonly IRequest $request,
@@ -448,6 +453,10 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		foreach ($rows as $row) {
 			$tableName = $this->firstRowValue($row);
 			if ($tableName === '') {
+				continue;
+			}
+
+			if (in_array($tableName, self::TECHNICAL_TABLES, true)) {
 				continue;
 			}
 
