@@ -401,7 +401,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 		$rows = $this->database->multiQuery(
 			'SELECT id, schema_name, logical_table, physical_table, generation, row_count, status, is_current, published_at, created_at, meta_json ' .
-			'FROM `base3_mat_registry` ORDER BY logical_table ASC, is_current DESC, published_at DESC, id DESC LIMIT 500'
+			'FROM `base3_mat_registry` ORDER BY logical_table ASC, is_current DESC, published_at DESC, id DESC'
 		);
 
 		return array_map(fn(array $row) => $this->normalizeRegistryRow($row), $rows);
@@ -417,7 +417,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 		$rows = $this->database->multiQuery(
 			'SELECT id, manifest_id, schema_name, logical_table, physical_table, generation, mode, status, message, row_count, started_at, finished_at, meta_json ' .
-			'FROM `base3_mat_run` ORDER BY id DESC LIMIT 200'
+			'FROM `base3_mat_run` ORDER BY id DESC'
 		);
 
 		return array_map(fn(array $row) => $this->normalizeRunRow($row), $rows);

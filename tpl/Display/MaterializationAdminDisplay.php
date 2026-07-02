@@ -497,7 +497,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				['Due', overview.due_manifest_count],
 				['Current generations', overview.current_generation_count],
 				['Tables', overview.materialized_table_count],
-				['Recent failures', overview.failed_recent_run_count]
+				['Failures', overview.failed_recent_run_count]
 			];
 
 			cardsElement.replaceChildren();
@@ -530,7 +530,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			return [
 				manifestGridDefinition('overview_due', false, 'Due materializations', 'Only manifests that are currently due.'),
 				manifestGridDefinition('overview_manifests', false, 'Manifests', 'Configured materializations and current state.'),
-				runGridDefinition('overview_runs', 'Recent runs', 'Most recent materialization builds.')
+				runGridDefinition('overview_runs', 'Runs', 'All materialization builds.')
 			];
 		}
 
@@ -841,7 +841,8 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				ModularGrid,
 				ResetPlugin,
 				SearchPlugin,
-				SessionStoragePlugin
+				SessionStoragePlugin,
+				InfiniteScrollPlugin
 			} = module;
 
 			const sortTypes = buildSortTypes(definition.columns);
@@ -883,7 +884,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					watchStateKeys: ['query']
 				},
 				features: {
-					paging: true
+					paging: false
 				},
 				pageSize: definition.pageSize || 50,
 				sort: {
@@ -896,7 +897,8 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					InfoPlugin,
 					ColumnVisibilityPlugin,
 					ResetPlugin,
-					SessionStoragePlugin
+					SessionStoragePlugin,
+					InfiniteScrollPlugin
 				],
 				pluginOptions: {
 					search: {
@@ -920,19 +922,31 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 						sections: ['query', 'columns']
 					},
 					sessionStorage: {
-						key: 'datahawk-materialization-grid-' + definition.gridView + '-v1',
+						key: 'datahawk-materialization-grid-' + definition.gridView + '-v2',
 						sections: ['query', 'columns']
 					},
 					info: {
 						zone: 'statusZone',
 						order: 10,
 						displayMode: 'loaded'
+					},
+					infiniteScroll: {
+						threshold: 180,
+						pageSize: definition.pageSize || 50,
+						containerSelector: '.mg-table-scroll'
 					}
 				},
 				columns: normalizeColumns(definition.columns)
 			});
 
 			gridInstances.set(definition.gridView, grid);
+
+			if(typeof grid.on === 'function') {
+				grid.on('data:appended', ({appendedCount, totalLoaded}) => {
+					setOutput('Loaded ' + String(appendedCount || 0) + ' more rows. ' + String(totalLoaded || 0) + ' rows are currently loaded.');
+				});
+			}
+
 			await grid.init();
 		}
 

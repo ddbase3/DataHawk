@@ -57,3 +57,10 @@ The first version intentionally keeps the grid feature set small:
 - inline refresh buttons for manifest rows.
 
 Filtering and row detail panels can be added later without changing the underlying display endpoints.
+
+
+## Registry and run row limits
+
+The materialization admin UI intentionally shows all entries from `base3_mat_registry` and `base3_mat_run`. These tables are administrative history tables, not sampled log views. Old cleanup or retention should be handled by a dedicated maintenance job, not by hiding rows in the UI query.
+
+The ModularGrid views may still request data in batches for rendering, but the backend `total` reflects the complete table content.
