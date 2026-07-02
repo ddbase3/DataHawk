@@ -18,6 +18,7 @@
 
 namespace DataHawk\Materialization;
 
+use Base3\Database\Api\IDatabase;
 use ResourceFoundation\Api\IMaterializationSchemaProvider;
 use ResourceFoundation\Dto\FieldMetadata;
 use ResourceFoundation\Dto\ForeignKeyReference;
@@ -36,8 +37,12 @@ class ManifestMaterializationSchemaProvider implements IMaterializationSchemaPro
 	/** @var TableMetadata[]|null */
 	private ?array $schema = null;
 
+	/** @var array<string, bool> */
+	private array $tableExistsCache = [];
+
 	public function __construct(
-		private readonly string $manifestDir
+		private readonly string $manifestDir,
+		private readonly ?IDatabase $database = null
 	) {}
 
 	/**
@@ -109,14 +114,27 @@ class ManifestMaterializationSchemaProvider implements IMaterializationSchemaPro
 
 		$manifests = [];
 		$manifestData = [];
+		$manifestPriorities = [];
 
 		foreach ($files as $file) {
 			$data = $this->loadManifestData($file);
+			if (!$this->isManifestDataActive($data)) {
+				continue;
+			}
+
+			$data = $this->applyConditionalQueryParts($data);
 			$manifest = MaterializationManifest::fromArray($data);
 			$this->validateManifest($manifest, $file);
 
+			$variantPriority = $this->getVariantPriority($data);
+			$currentPriority = $manifestPriorities[$manifest->id] ?? PHP_INT_MIN;
+			if (isset($manifests[$manifest->id]) && $variantPriority < $currentPriority) {
+				continue;
+			}
+
 			$manifests[$manifest->id] = $manifest;
 			$manifestData[$manifest->id] = $data;
+			$manifestPriorities[$manifest->id] = $variantPriority;
 		}
 
 		$this->manifestData = $manifestData;
@@ -135,6 +153,200 @@ class ManifestMaterializationSchemaProvider implements IMaterializationSchemaPro
 		}
 
 		return $data;
+	}
+
+	private function isManifestDataActive(array $data): bool {
+		if (array_key_exists('enabled', $data) && !$this->normalizeBoolean($data['enabled'], true)) {
+			return false;
+		}
+
+		return $this->conditionsMatch($this->getConditions($data));
+	}
+
+	private function conditionsMatch(array $conditions): bool {
+		if ($conditions === []) {
+			return true;
+		}
+
+		$requiresTables = $this->normalizeStringList($conditions['requiresTables'] ?? $conditions['requires_tables'] ?? []);
+		foreach ($requiresTables as $table) {
+			if (!$this->tableExists($table)) {
+				return false;
+			}
+		}
+
+		$missingTables = $this->normalizeStringList($conditions['missingTables'] ?? $conditions['missing_tables'] ?? []);
+		foreach ($missingTables as $table) {
+			if ($this->tableExists($table)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	private function getVariantPriority(array $data): int {
+		$conditions = $this->getConditions($data);
+		return (int)($data['variantPriority'] ?? $data['variant_priority'] ?? $conditions['priority'] ?? 0);
+	}
+
+	private function getConditions(array $data): array {
+		$conditions = $data['conditions'] ?? $data['condition'] ?? [];
+		if (is_array($conditions) && $conditions !== []) {
+			return $conditions;
+		}
+
+		if (isset($data['requiresTables']) || isset($data['requires_tables']) || isset($data['missingTables']) || isset($data['missing_tables'])) {
+			return $data;
+		}
+
+		return [];
+	}
+
+	private function applyConditionalQueryParts(array $data): array {
+		$conditionalWhere = $this->normalizeConditionalEntries($data['conditionalWhere'] ?? $data['conditional_where'] ?? []);
+		unset($data['conditionalWhere'], $data['conditional_where']);
+
+		if ($conditionalWhere === []) {
+			return $data;
+		}
+
+		foreach ($conditionalWhere as $entry) {
+			if (!is_array($entry) || !$this->conditionsMatch($this->getConditions($entry))) {
+				continue;
+			}
+
+			$where = $entry['where'] ?? $entry['filter'] ?? null;
+			if (is_array($where)) {
+				$query = is_array($data['query'] ?? null) ? $data['query'] : [];
+				$query['where'] = $this->mergeWhere($query['where'] ?? null, $where);
+				$data['query'] = $query;
+			}
+
+			$dependsOn = $this->normalizeStringList($entry['dependsOn'] ?? $entry['depends_on'] ?? []);
+			if ($dependsOn !== []) {
+				$data['dependsOn'] = array_values(array_unique(array_merge(
+					$this->normalizeStringList($data['dependsOn'] ?? $data['depends_on'] ?? []),
+					$dependsOn
+				)));
+			}
+		}
+
+		return $data;
+	}
+
+	private function mergeWhere(mixed $existingWhere, array $additionalWhere): array {
+		if (!is_array($existingWhere) || $existingWhere === []) {
+			return $additionalWhere;
+		}
+
+		return [
+			'type' => 'op',
+			'operator' => 'AND',
+			'params' => [
+				$existingWhere,
+				$additionalWhere
+			]
+		];
+	}
+
+	/**
+	 * @return array<int, array>
+	 */
+	private function normalizeConditionalEntries(mixed $value): array {
+		if (!is_array($value) || $value === []) {
+			return [];
+		}
+
+		if (!$this->isList($value)) {
+			return [$value];
+		}
+
+		$result = [];
+		foreach ($value as $entry) {
+			if (is_array($entry)) {
+				$result[] = $entry;
+			}
+		}
+
+		return $result;
+	}
+
+	private function normalizeBoolean(mixed $value, bool $default): bool {
+		if (is_bool($value)) {
+			return $value;
+		}
+
+		if (is_numeric($value)) {
+			return (int)$value !== 0;
+		}
+
+		if (is_string($value)) {
+			$value = strtolower(trim($value));
+			if (in_array($value, ['1', 'true', 'yes', 'on', 'enabled'], true)) {
+				return true;
+			}
+
+			if (in_array($value, ['0', 'false', 'no', 'off', 'disabled'], true)) {
+				return false;
+			}
+		}
+
+		return $default;
+	}
+
+	private function isList(array $value): bool {
+		return $value === [] || array_keys($value) === range(0, count($value) - 1);
+	}
+
+	/**
+	 * @return string[]
+	 */
+	private function normalizeStringList(mixed $value): array {
+		if (is_string($value)) {
+			$value = explode(',', $value);
+		}
+
+		if (!is_array($value)) {
+			return [];
+		}
+
+		$result = [];
+		foreach ($value as $item) {
+			$item = trim((string)$item);
+			if ($item !== '') {
+				$result[] = $item;
+			}
+		}
+
+		return array_values(array_unique($result));
+	}
+
+	private function tableExists(string $tableName): bool {
+		$tableName = trim($tableName);
+		if ($tableName === '') {
+			return false;
+		}
+
+		if (array_key_exists($tableName, $this->tableExistsCache)) {
+			return $this->tableExistsCache[$tableName];
+		}
+
+		if ($this->database === null) {
+			return $this->tableExistsCache[$tableName] = false;
+		}
+
+		try {
+			$this->database->connect();
+			if (!$this->database->connected()) {
+				return $this->tableExistsCache[$tableName] = false;
+			}
+
+			$rows = $this->database->listQuery('SHOW TABLES LIKE ' . $this->quoteLiteral($this->escapeLike($tableName)));
+			return $this->tableExistsCache[$tableName] = $rows !== [];
+		} catch (\Throwable) {
+			return $this->tableExistsCache[$tableName] = false;
+		}
 	}
 
 	private function validateManifest(MaterializationManifest $manifest, string $file): void {
@@ -244,6 +456,18 @@ class ManifestMaterializationSchemaProvider implements IMaterializationSchemaPro
 		}
 
 		return $result;
+	}
+
+	private function quoteLiteral(string $value): string {
+		if ($this->database === null) {
+			return "'" . str_replace("'", "''", $value) . "'";
+		}
+
+		return "'" . $this->database->escape($value) . "'";
+	}
+
+	private function escapeLike(string $value): string {
+		return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
 	}
 
 	private function splitQualifiedTableName(string $tableName): array {

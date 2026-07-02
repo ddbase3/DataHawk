@@ -161,6 +161,133 @@ class DatabaseMaterializationRegistry implements IMaterializationRegistry, IMate
 		return $generations;
 	}
 
+
+	public function cleanupHistory(int $keepRunsPerManifest = 100): array {
+		$this->ensureTables();
+
+		$registryCleanup = $this->cleanupDanglingRegistryRows();
+		$runCleanup = $this->cleanupOldRunRows($keepRunsPerManifest);
+
+		return [
+			'registry' => $registryCleanup,
+			'runs' => $runCleanup
+		];
+	}
+
+	private function cleanupDanglingRegistryRows(): array {
+		$existingTables = array_flip($this->listBase3MaterializationTables());
+		$rows = $this->database->multiQuery(
+			'SELECT id, physical_table, is_current FROM ' . $this->quoteIdentifier(self::REGISTRY_TABLE) .
+			' ORDER BY id ASC'
+		);
+
+		$deleteIds = [];
+		foreach ($rows as $row) {
+			$id = (int)($row['id'] ?? 0);
+			if ($id <= 0) {
+				continue;
+			}
+
+			if ((int)($row['is_current'] ?? 0) === 1) {
+				continue;
+			}
+
+			$physicalTable = (string)($row['physical_table'] ?? '');
+			if ($physicalTable === '' || !isset($existingTables[$physicalTable])) {
+				$deleteIds[] = $id;
+			}
+		}
+
+		$deleted = $this->deleteRowsByIds(self::REGISTRY_TABLE, $deleteIds);
+
+		return [
+			'checked' => count($rows),
+			'deleted' => $deleted
+		];
+	}
+
+	private function cleanupOldRunRows(int $keepRunsPerManifest): array {
+		$keepRunsPerManifest = max(1, $keepRunsPerManifest);
+		$rows = $this->database->multiQuery(
+			'SELECT id, manifest_id, status FROM ' . $this->quoteIdentifier(self::RUN_TABLE) .
+			' ORDER BY manifest_id ASC, started_at DESC, id DESC'
+		);
+
+		$seenByManifest = [];
+		$deleteIds = [];
+
+		foreach ($rows as $row) {
+			$id = (int)($row['id'] ?? 0);
+			if ($id <= 0) {
+				continue;
+			}
+
+			$status = (string)($row['status'] ?? '');
+			if ($status === 'running') {
+				continue;
+			}
+
+			$manifestId = (string)($row['manifest_id'] ?? '');
+			if ($manifestId === '') {
+				$manifestId = '__unknown__';
+			}
+
+			$seenByManifest[$manifestId] = ($seenByManifest[$manifestId] ?? 0) + 1;
+			if ($seenByManifest[$manifestId] > $keepRunsPerManifest) {
+				$deleteIds[] = $id;
+			}
+		}
+
+		$deleted = $this->deleteRowsByIds(self::RUN_TABLE, $deleteIds);
+
+		return [
+			'checked' => count($rows),
+			'keepRunsPerManifest' => $keepRunsPerManifest,
+			'deleted' => $deleted
+		];
+	}
+
+	/**
+	 * @return string[]
+	 */
+	private function listBase3MaterializationTables(): array {
+		$rows = $this->database->multiQuery("SHOW TABLES LIKE 'base3\\_mat\\_%'");
+		$tables = [];
+
+		foreach ($rows as $row) {
+			$table = $this->firstRowValue($row);
+			if ($table !== '' && $this->isSafePhysicalTable($table)) {
+				$tables[] = $table;
+			}
+		}
+
+		return array_values(array_unique($tables));
+	}
+
+	private function deleteRowsByIds(string $table, array $ids): int {
+		$ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn(int $id) => $id > 0)));
+		if ($ids === []) {
+			return 0;
+		}
+
+		foreach (array_chunk($ids, 250) as $chunk) {
+			$this->database->nonQuery(
+				'DELETE FROM ' . $this->quoteIdentifier($table) .
+				' WHERE id IN (' . implode(',', $chunk) . ')'
+			);
+		}
+
+		return count($ids);
+	}
+
+	private function firstRowValue(array $row): string {
+		foreach ($row as $value) {
+			return trim((string)$value);
+		}
+
+		return '';
+	}
+
 	public function ensureTables(): void {
 		if ($this->initialized) {
 			return;
@@ -284,6 +411,11 @@ class DatabaseMaterializationRegistry implements IMaterializationRegistry, IMate
 	private function encodeJson(array $data): string {
 		$json = json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 		return $json === false ? '{}' : $json;
+	}
+
+
+	private function isSafePhysicalTable(string $table): bool {
+		return str_starts_with($table, 'base3_mat_') && preg_match('/^[a-zA-Z0-9_]+$/', $table) === 1;
 	}
 
 	private function quoteIdentifier(string $identifier): string {

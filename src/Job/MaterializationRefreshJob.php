@@ -22,6 +22,7 @@ use Base3\Api\IContainer;
 use Base3\Configuration\Api\IConfiguration;
 use Base3\State\Api\IStateStore;
 use Base3\Worker\Api\IJob;
+use DataHawk\Materialization\DatabaseMaterializationRegistry;
 use DataHawk\Materialization\MaterializationRefreshPlanner;
 use ResourceFoundation\Api\IMaterializationManifestProvider;
 use ResourceFoundation\Api\IMaterializationRegistry;
@@ -89,6 +90,7 @@ final class MaterializationRefreshJob implements IJob {
 		$planner = new MaterializationRefreshPlanner($manifestProvider, $registry, $stateStore);
 		$mode = $this->getRefreshMode($stateStore);
 		$force = $this->isForced($stateStore);
+		$maintenanceMessage = $this->runMaintenanceIfDue($registry, $stateStore);
 
 		try {
 			$manifestIds = $planner->getManifestIdsToRefresh($this->getConfiguredManifestIds($stateStore), $force);
@@ -97,7 +99,7 @@ final class MaterializationRefreshJob implements IJob {
 		}
 
 		if ($manifestIds === []) {
-			return 'Skip (no materializations due)';
+			return $maintenanceMessage !== '' ? $maintenanceMessage : 'Skip (no materializations due)';
 		}
 
 		$results = [];
@@ -127,13 +129,15 @@ final class MaterializationRefreshJob implements IJob {
 		$dueText = implode(',', $manifestIds);
 		$forceText = $force ? ', force: 1' : '';
 
+		$maintenanceText = $maintenanceMessage !== '' ? '; ' . $maintenanceMessage : '';
+
 		if ($failed === []) {
-			return 'Materialization refresh done (' . $successCount . '/' . count($results) . ' succeeded, mode: ' . $mode . ', due: ' . $dueText . $forceText . ')';
+			return 'Materialization refresh done (' . $successCount . '/' . count($results) . ' succeeded, mode: ' . $mode . ', due: ' . $dueText . $forceText . ')' . $maintenanceText;
 		}
 
 		return 'Materialization refresh finished with failures ('
 			. $successCount . '/' . count($results) . ' succeeded, mode: ' . $mode . ', due: ' . $dueText . $forceText . '): '
-			. $this->formatFailures($failed);
+			. $this->formatFailures($failed) . $maintenanceText;
 	}
 
 	private function getJobConf(): array {
@@ -224,6 +228,59 @@ final class MaterializationRefreshJob implements IJob {
 				message: $e->getMessage()
 			);
 		}
+	}
+
+
+	private function runMaintenanceIfDue(IMaterializationRegistry $registry, IStateStore $stateStore): string {
+		if (!$registry instanceof DatabaseMaterializationRegistry) {
+			return '';
+		}
+
+		if (!$this->isCleanupEnabled($stateStore)) {
+			return '';
+		}
+
+		$intervalSeconds = $this->getCleanupIntervalSeconds($stateStore);
+		$lastRun = (int)$stateStore->get($this->stateKey('cleanup.lastrun'), 0);
+		if ($lastRun > 0 && $lastRun + $intervalSeconds > time()) {
+			return '';
+		}
+
+		try {
+			$result = $registry->cleanupHistory($this->getCleanupKeepRunsPerManifest($stateStore));
+			$stateStore->set($this->stateKey('cleanup.lastrun'), time());
+			$stateStore->flush();
+
+			$registryDeleted = (int)($result['registry']['deleted'] ?? 0);
+			$runDeleted = (int)($result['runs']['deleted'] ?? 0);
+
+			return 'Materialization history cleanup done (registry deleted: ' . $registryDeleted . ', runs deleted: ' . $runDeleted . ')';
+		} catch (Throwable $e) {
+			return 'Materialization history cleanup failed: ' . $e->getMessage();
+		}
+	}
+
+	private function isCleanupEnabled(IStateStore $stateStore): bool {
+		$value = $this->readStateOrConfig($stateStore, 'cleanup.enabled', 1);
+		if (is_bool($value)) {
+			return $value;
+		}
+
+		if (is_numeric($value)) {
+			return (int)$value === 1;
+		}
+
+		return !in_array(strtolower(trim((string)$value)), ['0', 'false', 'no', 'off', 'disabled'], true);
+	}
+
+	private function getCleanupIntervalSeconds(IStateStore $stateStore): int {
+		$value = (int)$this->readStateOrConfig($stateStore, 'cleanup.interval_seconds', 86400);
+		return $value > 0 ? $value : 86400;
+	}
+
+	private function getCleanupKeepRunsPerManifest(IStateStore $stateStore): int {
+		$value = (int)$this->readStateOrConfig($stateStore, 'cleanup.keep_runs_per_manifest', 100);
+		return $value > 0 ? $value : 100;
 	}
 
 	private function readStateOrConfig(?IStateStore $stateStore, string $key, mixed $default): mixed {
