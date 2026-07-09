@@ -73,13 +73,25 @@ class DataHawkPlugin implements IPlugin, ICheck {
 				IContainer::SHARED | IContainer::NOOVERWRITE)
 
 			->set(
+				IMaterializationRunRepository::class,
+				fn($c) => $c->get(IMaterializationRegistry::class),
+				IContainer::SHARED | IContainer::NOOVERWRITE)
+
+			->set(
 				MaterializationPhysicalTableNameGenerator::class,
 				fn($c) => new MaterializationPhysicalTableNameGenerator(),
 				IContainer::SHARED | IContainer::NOOVERWRITE)
 
 			->set(
 				IMaterializationService::class,
-				fn($c) => $this->createMaterializationService($c),
+				fn($c) => new DefaultMaterializationService(
+					$c->get(IMaterializationManifestProvider::class),
+					$c->get(IQueryService::class),
+					$c->get(IMaterializationRegistry::class),
+					$c->get(MaterializationPhysicalTableNameGenerator::class),
+					$c->get(IMaterializationRunRepository::class),
+					$c->get(IDatabase::class)
+				),
 				IContainer::SHARED | IContainer::NOOVERWRITE)
 
 			->set(
@@ -112,32 +124,6 @@ class DataHawkPlugin implements IPlugin, ICheck {
 				IReportExporterFactory::class,
 				fn($c) => new ReportExporterFactory($c->get(IClassMap::class)),
 				IContainer::SHARED | IContainer::NOOVERWRITE);
-	}
-
-
-	private function createMaterializationService(IContainer $container): DefaultMaterializationService {
-		$registry = $container->get(IMaterializationRegistry::class);
-		$runRepository = null;
-
-		if ($container->has(IMaterializationRunRepository::class)) {
-			$service = $container->get(IMaterializationRunRepository::class);
-			if ($service instanceof IMaterializationRunRepository) {
-				$runRepository = $service;
-			}
-		}
-
-		if ($runRepository === null && $registry instanceof IMaterializationRunRepository) {
-			$runRepository = $registry;
-		}
-
-		return new DefaultMaterializationService(
-			$container->get(IMaterializationManifestProvider::class),
-			$container->get(IQueryService::class),
-			$registry,
-			$container->get(MaterializationPhysicalTableNameGenerator::class),
-			$runRepository,
-			$container->get(IDatabase::class)
-		);
 	}
 
 	// Implementation of ICheck
