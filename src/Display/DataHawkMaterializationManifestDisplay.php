@@ -25,11 +25,13 @@ final class DataHawkMaterializationManifestDisplay extends AbstractDataHawkMater
 	}
 
 	public function getHelp(): string {
-		return 'Shows DataHawk materialization manifests.';
+		$this->loadTranslations();
+
+		return $this->t('help_manifests', 'Shows DataHawk materialization manifests.');
 	}
 
 	protected function getTitle(): string {
-		return 'Materialization manifests';
+		return $this->t('title_manifests', 'Materialization manifests');
 	}
 
 	protected function getViewName(): string {

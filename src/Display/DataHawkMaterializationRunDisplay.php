@@ -25,11 +25,13 @@ final class DataHawkMaterializationRunDisplay extends AbstractDataHawkMaterializ
 	}
 
 	public function getHelp(): string {
-		return 'Shows DataHawk materialization runs.';
+		$this->loadTranslations();
+
+		return $this->t('help_runs', 'Shows DataHawk materialization runs.');
 	}
 
 	protected function getTitle(): string {
-		return 'Materialization runs';
+		return $this->t('title_runs', 'Materialization runs');
 	}
 
 	protected function getViewName(): string {

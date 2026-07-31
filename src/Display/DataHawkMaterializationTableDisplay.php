@@ -25,11 +25,13 @@ final class DataHawkMaterializationTableDisplay extends AbstractDataHawkMaterial
 	}
 
 	public function getHelp(): string {
-		return 'Shows DataHawk materialization tables.';
+		$this->loadTranslations();
+
+		return $this->t('help_tables', 'Shows DataHawk materialization tables.');
 	}
 
 	protected function getTitle(): string {
-		return 'Materialization tables';
+		return $this->t('title_tables', 'Materialization tables');
 	}
 
 	protected function getViewName(): string {

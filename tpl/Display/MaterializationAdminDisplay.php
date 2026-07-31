@@ -4,6 +4,11 @@ $viewName = (string)$this->_['viewName'];
 $serviceUrl = (string)$this->_['service'];
 $modularGridCssUrl = (string)$this->_['modularGridCssUrl'];
 $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
+$translations = is_array($this->_['translations'] ?? null) ? $this->_['translations'] : [];
+$t = static function(string $key, string $fallback) use ($translations): string {
+	$text = trim((string)($translations[$key] ?? ''));
+	return $text !== '' ? $text : $fallback;
+};
 ?>
 <link rel="stylesheet" href="<?php echo htmlspecialchars($modularGridCssUrl, ENT_QUOTES); ?>" />
 
@@ -259,13 +264,13 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 <div class="datahawk-materialization-shell">
 	<h1><?php echo htmlspecialchars($title, ENT_QUOTES); ?></h1>
 	<p>
-		DataHawk materialization status based on JSON manifests, the registry, recent runs and generated physical tables.
+		<?php echo htmlspecialchars($t('intro', 'DataHawk materialization status based on JSON manifests, the registry, recent runs and generated physical tables.'), ENT_QUOTES); ?>
 	</p>
 
 	<div class="datahawk-materialization-toolbar">
-		<button type="button" class="datahawk-materialization-button" id="datahawk-materialization-reload">Reload</button>
-		<button type="button" class="datahawk-materialization-button datahawk-materialization-button-primary" id="datahawk-materialization-refresh-due">Refresh due</button>
-		<button type="button" class="datahawk-materialization-button" id="datahawk-materialization-refresh-all">Refresh all</button>
+		<button type="button" class="datahawk-materialization-button" id="datahawk-materialization-reload"><?php echo htmlspecialchars($t('reload', 'Reload'), ENT_QUOTES); ?></button>
+		<button type="button" class="datahawk-materialization-button datahawk-materialization-button-primary" id="datahawk-materialization-refresh-due"><?php echo htmlspecialchars($t('refresh_due', 'Refresh due'), ENT_QUOTES); ?></button>
+		<button type="button" class="datahawk-materialization-button" id="datahawk-materialization-refresh-all"><?php echo htmlspecialchars($t('refresh_all', 'Refresh all'), ENT_QUOTES); ?></button>
 	</div>
 
 	<div id="datahawk-materialization-cards" class="datahawk-materialization-cards"></div>
@@ -278,6 +283,12 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 		const ENDPOINT_URL = <?php echo json_encode($serviceUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 		const VIEW_NAME = <?php echo json_encode($viewName, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 		const MODULAR_GRID_URL = <?php echo json_encode($modularGridJsUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+		const TRANSLATIONS = <?php echo json_encode($translations, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+
+		function tr(key, fallback) {
+			const value = String(TRANSLATIONS[key] || '').trim();
+			return value !== '' ? value : fallback;
+		}
 		const contentElement = document.getElementById('datahawk-materialization-content');
 		const cardsElement = document.getElementById('datahawk-materialization-cards');
 		const outputElement = document.getElementById('datahawk-materialization-output');
@@ -306,9 +317,9 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			outputElement.replaceChildren();
 
 			const strong = document.createElement('strong');
-			strong.textContent = 'Last action:';
+			strong.textContent = tr('last_action', 'Last action:');
 			outputElement.appendChild(strong);
-			outputElement.appendChild(document.createTextNode(' ' + getText(message, 'None')));
+			outputElement.appendChild(document.createTextNode(' ' + getText(message, tr('value_none', 'None'))));
 		}
 
 		function createElement(tagName, className = '', text = null) {
@@ -348,29 +359,29 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 
 		function createStatusPill(status) {
 			const value = getText(status, 'unknown');
-			return createPill(value, value);
+			return createPill(tr('status_' + value, value), value);
 		}
 
 		function createCurrentPill(isCurrent) {
-			return isCurrent ? createPill('current', 'current') : createPill('old', 'old');
+			return isCurrent ? createPill(tr('status_current', 'current'), 'current') : createPill(tr('status_old', 'old'), 'old');
 		}
 
 		function createRegisteredPill(isRegistered) {
-			return isRegistered ? createPill('yes', 'success') : createPill('no', 'failed');
+			return isRegistered ? createPill(tr('value_yes', 'yes'), 'success') : createPill(tr('value_no', 'no'), 'failed');
 		}
 
 		function createDuePill(row) {
 			if(!row.enabled) {
-				return createPill('disabled', 'disabled');
+				return createPill(tr('status_disabled', 'disabled'), 'disabled');
 			}
 
-			return row.is_due ? createPill('due', 'due') : createPill('ok', 'success');
+			return row.is_due ? createPill(tr('status_due', 'due'), 'due') : createPill(tr('status_ok', 'ok'), 'success');
 		}
 
 		function actionButton(manifestId) {
-			const button = createButton('Refresh', 'datahawk-materialization-button-small');
+			const button = createButton(tr('refresh', 'Refresh'), 'datahawk-materialization-button-small');
 			button.addEventListener('click', () => {
-				refreshManifest(manifestId).catch((error) => setOutput('Refresh failed: ' + getText(error && error.message, String(error))));
+				refreshManifest(manifestId).catch((error) => setOutput(tr('refresh_failed', 'Refresh failed:') + ' ' + getText(error && error.message, String(error))));
 			});
 
 			return button;
@@ -384,7 +395,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			});
 
 			if(!response.ok) {
-				throw new Error('Request failed with status ' + String(response.status));
+				throw new Error(tr('request_failed_status', 'Request failed with status %s').replace('%s', String(response.status)));
 			}
 
 			return await response.json();
@@ -406,21 +417,21 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			const response = await postJson({mode: 'page'});
 
 			if(!response || response.ok !== true) {
-				throw new Error(getText(response && response.error, 'Failed to load materialization data.'));
+				throw new Error(getText(response && response.error, tr('load_failed_data', 'Failed to load materialization data.')));
 			}
 
 			currentPage = response;
 			renderPage(response);
 			await initGrids(response);
-			setOutput('Loaded materialization data at ' + getText(new Date().toLocaleString()));
+			setOutput(tr('loaded_at', 'Loaded materialization data at %s').replace('%s', getText(new Date().toLocaleString())));
 		}
 
 		async function refreshManifest(manifestId) {
-			setOutput('Refreshing ' + manifestId + ' ...');
+			setOutput(tr('refreshing_manifest', 'Refreshing %s ...').replace('%s', manifestId));
 			const response = await postJson({mode: 'refresh_manifest', manifestId, buildMode: 'refresh'});
 
 			if(!response) {
-				throw new Error('No response.');
+				throw new Error(tr('no_response', 'No response.'));
 			}
 
 			const page = response.page || null;
@@ -435,15 +446,15 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			}
 
 			const result = response.result || {};
-			setOutput('Refresh ' + manifestId + ': ' + getText(result.message, response.ok ? 'done' : 'failed'));
+			setOutput(tr('refresh_result', 'Refresh %s: %s').replace('%s', manifestId).replace('%s', getText(result.message, response.ok ? tr('status_done', 'done') : tr('status_failed', 'failed'))));
 		}
 
 		async function refreshDue(force) {
-			setOutput(force ? 'Refreshing all materializations ...' : 'Refreshing due materializations ...');
+			setOutput(force ? tr('refreshing_all', 'Refreshing all materializations ...') : tr('refreshing_due', 'Refreshing due materializations ...'));
 			const response = await postJson({mode: force ? 'refresh_all' : 'refresh_due'});
 
 			if(!response) {
-				throw new Error('No response.');
+				throw new Error(tr('no_response', 'No response.'));
 			}
 
 			const page = response.page || null;
@@ -458,7 +469,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			}
 
 			const ids = response.manifestIds || [];
-			setOutput((force ? 'Refresh all' : 'Refresh due') + ' finished: ' + (ids.length ? ids.join(', ') : 'no materializations due'));
+			setOutput(tr('refresh_finished', '%s finished: %s').replace('%s', force ? tr('refresh_all', 'Refresh all') : tr('refresh_due', 'Refresh due')).replace('%s', ids.length ? ids.join(', ') : tr('no_materializations_due', 'no materializations due')));
 		}
 
 		function renderPage(page) {
@@ -492,12 +503,12 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			}
 
 			const cards = [
-				['Manifests', overview.manifest_count],
-				['Enabled', overview.enabled_manifest_count],
-				['Due', overview.due_manifest_count],
-				['Current generations', overview.current_generation_count],
-				['Tables', overview.materialized_table_count],
-				['Failures', overview.failed_recent_run_count]
+				[tr('manifests', 'Manifests'), overview.manifest_count],
+				[tr('enabled', 'Enabled'), overview.enabled_manifest_count],
+				[tr('due', 'Due'), overview.due_manifest_count],
+				[tr('current_generations', 'Current generations'), overview.current_generation_count],
+				[tr('tables', 'Tables'), overview.materialized_table_count],
+				[tr('failures', 'Failures'), overview.failed_recent_run_count]
 			];
 
 			cardsElement.replaceChildren();
@@ -528,17 +539,17 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			}
 
 			return [
-				manifestGridDefinition('overview_due', false, 'Due materializations', 'Only manifests that are currently due.'),
-				manifestGridDefinition('overview_manifests', false, 'Manifests', 'Configured materializations and current state.'),
-				runGridDefinition('overview_runs', 'Runs', 'All materialization builds.')
+				manifestGridDefinition('overview_due', false, tr('due_materializations', 'Due materializations'), tr('due_materializations_description', 'Only manifests that are currently due.')),
+				manifestGridDefinition('overview_manifests', false, tr('manifests', 'Manifests'), tr('manifests_description', 'Configured materializations and current state.')),
+				runGridDefinition('overview_runs', tr('runs', 'Runs'), tr('runs_description', 'All materialization builds.'))
 			];
 		}
 
-		function manifestGridDefinition(gridView, detailed = true, title = 'Manifests', description = '') {
+		function manifestGridDefinition(gridView, detailed = true, title = tr('manifests', 'Manifests'), description = '') {
 			const columns = [
 				{
 					key: 'due_text',
-					label: 'Due',
+					label: tr('due', 'Due'),
 					width: 90,
 					sortType: 'string',
 					render(value, row) {
@@ -547,7 +558,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				},
 				{
 					key: 'id',
-					label: 'Manifest',
+					label: tr('manifest', 'Manifest'),
 					width: 230,
 					sortType: 'string',
 					render(value) {
@@ -556,7 +567,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				},
 				{
 					key: 'logical_table',
-					label: 'Target',
+					label: tr('target', 'Target'),
 					width: 260,
 					sortType: 'string',
 					render(value, row) {
@@ -565,25 +576,25 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				},
 				{
 					key: 'schedule_text',
-					label: 'Schedule',
+					label: tr('schedule', 'Schedule'),
 					width: 160,
 					sortType: 'string'
 				},
 				{
 					key: 'current_row_count',
-					label: 'Rows',
+					label: tr('rows', 'Rows'),
 					width: 100,
 					sortType: 'number'
 				},
 				{
 					key: 'last_success_text',
-					label: 'Last success',
+					label: tr('last_success', 'Last success'),
 					width: 170,
 					sortType: 'string'
 				},
 				{
 					key: 'actions',
-					label: 'Action',
+					label: tr('action', 'Action'),
 					width: 110,
 					sortable: false,
 					render(value, row) {
@@ -596,13 +607,13 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				columns.splice(4, 0,
 					{
 						key: 'dependency_refresh',
-						label: 'Dependency mode',
+						label: tr('dependency_mode', 'Dependency mode'),
 						width: 150,
 						sortType: 'string'
 					},
 					{
 						key: 'depends_on',
-						label: 'Depends on',
+						label: tr('depends_on', 'Depends on'),
 						width: 260,
 						sortType: 'string',
 						render(value) {
@@ -620,12 +631,12 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				columns,
 				defaultSortKey: 'priority',
 				defaultSortDirection: 'asc',
-				searchPlaceholder: 'Search manifests, tables or schedule',
+				searchPlaceholder: tr('search_manifests', 'Search manifests, tables or schedule'),
 				pageSize: 50
 			};
 		}
 
-		function registryGridDefinition(gridView, title = 'Registry', description = '') {
+		function registryGridDefinition(gridView, title = tr('registry', 'Registry'), description = '') {
 			return {
 				gridView,
 				rootId: 'datahawk-materialization-grid-' + gridView,
@@ -633,12 +644,12 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				description,
 				defaultSortKey: 'logical_table',
 				defaultSortDirection: 'asc',
-				searchPlaceholder: 'Search registry',
+				searchPlaceholder: tr('search_registry', 'Search registry'),
 				pageSize: 50,
 				columns: [
 					{
 						key: 'is_current',
-						label: 'Current',
+						label: tr('current', 'Current'),
 						width: 100,
 						sortType: 'number',
 						render(value, row) {
@@ -647,7 +658,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					},
 					{
 						key: 'logical_table',
-						label: 'Logical table',
+						label: tr('logical_table', 'Logical table'),
 						width: 260,
 						sortType: 'string',
 						render(value, row) {
@@ -656,7 +667,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					},
 					{
 						key: 'physical_table',
-						label: 'Physical table',
+						label: tr('physical_table', 'Physical table'),
 						width: 420,
 						sortType: 'string',
 						render(value) {
@@ -665,30 +676,30 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					},
 					{
 						key: 'row_count',
-						label: 'Rows',
+						label: tr('rows', 'Rows'),
 						width: 100,
 						sortType: 'number'
 					},
 					{
 						key: 'published_text',
-						label: 'Published',
+						label: tr('published', 'Published'),
 						width: 170,
 						sortType: 'string'
 					},
 					{
 						key: 'status',
-						label: 'Status',
+						label: tr('status', 'Status'),
 						width: 120,
 						sortType: 'string',
 						render(value) {
-							return createPill(value, value === 'published' ? 'success' : '');
+							return createPill(tr('status_' + getText(value, 'unknown'), getText(value)), value === 'published' ? 'success' : '');
 						}
 					}
 				]
 			};
 		}
 
-		function runGridDefinition(gridView, title = 'Runs', description = '') {
+		function runGridDefinition(gridView, title = tr('runs', 'Runs'), description = '') {
 			return {
 				gridView,
 				rootId: 'datahawk-materialization-grid-' + gridView,
@@ -696,12 +707,12 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				description,
 				defaultSortKey: 'id',
 				defaultSortDirection: 'desc',
-				searchPlaceholder: 'Search runs, messages or manifests',
+				searchPlaceholder: tr('search_runs', 'Search runs, messages or manifests'),
 				pageSize: 50,
 				columns: [
 					{
 						key: 'status',
-						label: 'Status',
+						label: tr('status', 'Status'),
 						width: 110,
 						sortType: 'string',
 						render(value) {
@@ -710,7 +721,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					},
 					{
 						key: 'manifest_id',
-						label: 'Manifest',
+						label: tr('manifest', 'Manifest'),
 						width: 220,
 						sortType: 'string',
 						render(value) {
@@ -719,34 +730,34 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					},
 					{
 						key: 'row_count',
-						label: 'Rows',
+						label: tr('rows', 'Rows'),
 						width: 100,
 						sortType: 'number'
 					},
 					{
 						key: 'started_text',
-						label: 'Started',
+						label: tr('started', 'Started'),
 						width: 170,
 						sortType: 'string'
 					},
 					{
 						key: 'finished_text',
-						label: 'Finished',
+						label: tr('finished', 'Finished'),
 						width: 170,
 						sortType: 'string'
 					},
 					{
 						key: 'duration',
-						label: 'Duration',
+						label: tr('duration', 'Duration'),
 						width: 110,
 						sortType: 'number',
 						render(value) {
-							return value === null || value === undefined ? '-' : String(value) + ' sec';
+							return value === null || value === undefined ? '-' : String(value) + ' ' + tr('seconds_short', 'sec');
 						}
 					},
 					{
 						key: 'message',
-						label: 'Message',
+						label: tr('message', 'Message'),
 						width: 420,
 						sortType: 'string'
 					}
@@ -754,7 +765,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 			};
 		}
 
-		function tableGridDefinition(gridView, title = 'Tables', description = '') {
+		function tableGridDefinition(gridView, title = tr('tables', 'Tables'), description = '') {
 			return {
 				gridView,
 				rootId: 'datahawk-materialization-grid-' + gridView,
@@ -762,12 +773,12 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 				description,
 				defaultSortKey: 'table_name',
 				defaultSortDirection: 'asc',
-				searchPlaceholder: 'Search materialized tables',
+				searchPlaceholder: tr('search_tables', 'Search materialized tables'),
 				pageSize: 50,
 				columns: [
 					{
 						key: 'is_current',
-						label: 'Current',
+						label: tr('current', 'Current'),
 						width: 100,
 						sortType: 'number',
 						render(value, row) {
@@ -776,7 +787,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					},
 					{
 						key: 'table_name',
-						label: 'Table',
+						label: tr('table', 'Table'),
 						width: 420,
 						sortType: 'string',
 						render(value) {
@@ -785,7 +796,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					},
 					{
 						key: 'logical_table',
-						label: 'Logical table',
+						label: tr('logical_table', 'Logical table'),
 						width: 230,
 						sortType: 'string',
 						render(value) {
@@ -794,19 +805,19 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					},
 					{
 						key: 'row_count',
-						label: 'Rows',
+						label: tr('rows', 'Rows'),
 						width: 100,
 						sortType: 'number'
 					},
 					{
 						key: 'published_text',
-						label: 'Published',
+						label: tr('published', 'Published'),
 						width: 170,
 						sortType: 'string'
 					},
 					{
 						key: 'is_registered',
-						label: 'Registered',
+						label: tr('registered', 'Registered'),
 						width: 120,
 						sortType: 'number',
 						render(value, row) {
@@ -904,8 +915,8 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					search: {
 						zone: 'topLine1',
 						order: 10,
-						label: 'Search',
-						placeholder: definition.searchPlaceholder || 'Search'
+						label: tr('search', 'Search'),
+						placeholder: definition.searchPlaceholder || tr('search', 'Search')
 					},
 					headerMenu: {
 						showSortActions: true,
@@ -918,7 +929,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 					reset: {
 						zone: 'topLine1',
 						order: 30,
-						label: 'Reset',
+						label: tr('reset', 'Reset'),
 						sections: ['query', 'columns']
 					},
 					sessionStorage: {
@@ -943,7 +954,7 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 
 			if(typeof grid.on === 'function') {
 				grid.on('data:appended', ({appendedCount, totalLoaded}) => {
-					setOutput('Loaded ' + String(appendedCount || 0) + ' more rows. ' + String(totalLoaded || 0) + ' rows are currently loaded.');
+					setOutput(tr('loaded_more_rows', 'Loaded %s more rows. %s rows are currently loaded.').replace('%s', String(appendedCount || 0)).replace('%s', String(totalLoaded || 0)));
 				});
 			}
 
@@ -1013,21 +1024,21 @@ $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 		}
 
 		document.getElementById('datahawk-materialization-reload').addEventListener('click', () => {
-			loadPage('Reloading ...').catch((error) => setOutput('Reload failed: ' + getText(error && error.message, String(error))));
+			loadPage(tr('reloading', 'Reloading ...')).catch((error) => setOutput(tr('reload_failed', 'Reload failed:') + ' ' + getText(error && error.message, String(error))));
 		});
 
 		document.getElementById('datahawk-materialization-refresh-due').addEventListener('click', () => {
-			refreshDue(false).catch((error) => setOutput('Refresh due failed: ' + getText(error && error.message, String(error))));
+			refreshDue(false).catch((error) => setOutput(tr('refresh_due_failed', 'Refresh due failed:') + ' ' + getText(error && error.message, String(error))));
 		});
 
 		document.getElementById('datahawk-materialization-refresh-all').addEventListener('click', () => {
-			if(!window.confirm('Refresh all enabled materializations now?')) {
+			if(!window.confirm(tr('confirm_refresh_all', 'Refresh all enabled materializations now?'))) {
 				return;
 			}
 
-			refreshDue(true).catch((error) => setOutput('Refresh all failed: ' + getText(error && error.message, String(error))));
+			refreshDue(true).catch((error) => setOutput(tr('refresh_all_failed', 'Refresh all failed:') + ' ' + getText(error && error.message, String(error))));
 		});
 
-		loadPage('Loading ...').catch((error) => setOutput('Loading failed: ' + getText(error && error.message, String(error))));
+		loadPage(tr('loading', 'Loading ...')).catch((error) => setOutput(tr('loading_failed', 'Loading failed:') + ' ' + getText(error && error.message, String(error))));
 	})();
 </script>

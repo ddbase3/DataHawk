@@ -25,11 +25,13 @@ final class DataHawkMaterializationRegistryDisplay extends AbstractDataHawkMater
 	}
 
 	public function getHelp(): string {
-		return 'Shows the DataHawk materialization registry.';
+		$this->loadTranslations();
+
+		return $this->t('help_registry', 'Shows the DataHawk materialization registry.');
 	}
 
 	protected function getTitle(): string {
-		return 'Materialization registry';
+		return $this->t('title_registry', 'Materialization registry');
 	}
 
 	protected function getViewName(): string {

@@ -43,6 +43,8 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		'base3_mat_run',
 	];
 
+	private array $translations = [];
+
 	public function __construct(
 		private readonly IContainer $container,
 		private readonly IRequest $request,
@@ -57,6 +59,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	}
 
 	public function getOutput(string $out = 'html', bool $final = false): string {
+		$this->loadTranslations();
 		$out = strtolower((string)$out);
 
 		if ($out === 'json') {
@@ -75,6 +78,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		$this->view->setTemplate('Display/MaterializationAdminDisplay.php');
 		$this->view->assign('title', $this->getTitle());
 		$this->view->assign('viewName', $this->getViewName());
+		$this->view->assign('translations', $this->translations);
 		$this->view->assign(
 			'modularGridCssUrl',
 			$this->assetResolver->resolve('plugin/ClientStack/assets/modulargrid/styles/modulargrid.css')
@@ -102,7 +106,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		} catch (Throwable $e) {
 			$response = [
 				'ok' => false,
-				'error' => 'Materialization admin request failed.',
+				'error' => $this->t('error_admin_request_failed', 'Materialization admin request failed.'),
 				'details' => $e->getMessage(),
 			];
 		}
@@ -227,22 +231,22 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		$mode = $this->normalizeBuildMode($this->readString($payload, 'buildMode', 'refresh'));
 
 		if ($manifestId === '') {
-			return $this->buildErrorResponse('Missing materialization manifest id.', 'refresh_manifest');
+			return $this->buildErrorResponse($this->t('error_missing_manifest_id', 'Missing materialization manifest id.'), 'refresh_manifest');
 		}
 
 		$manifestProvider = $this->getManifestProvider();
 		if ($manifestProvider === null) {
-			return $this->buildErrorResponse('Materialization manifest provider is not wired.', 'refresh_manifest');
+			return $this->buildErrorResponse($this->t('error_manifest_provider_not_wired', 'Materialization manifest provider is not wired.'), 'refresh_manifest');
 		}
 
 		$manifest = $manifestProvider->getManifest($manifestId);
 		if ($manifest === null) {
-			return $this->buildErrorResponse('Unknown materialization manifest: ' . $manifestId, 'refresh_manifest');
+			return $this->buildErrorResponse($this->t('error_unknown_manifest', 'Unknown materialization manifest: %s', $manifestId), 'refresh_manifest');
 		}
 
 		$service = $this->getMaterializationService();
 		if ($service === null) {
-			return $this->buildErrorResponse('Materialization service is not wired.', 'refresh_manifest');
+			return $this->buildErrorResponse($this->t('error_service_not_wired', 'Materialization service is not wired.'), 'refresh_manifest');
 		}
 
 		$result = $this->refreshManifest($service, $manifestId, $mode);
@@ -263,22 +267,22 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	private function buildRefreshDueResponse(bool $force): array {
 		$manifestProvider = $this->getManifestProvider();
 		if ($manifestProvider === null) {
-			return $this->buildErrorResponse('Materialization manifest provider is not wired.', $force ? 'refresh_all' : 'refresh_due');
+			return $this->buildErrorResponse($this->t('error_manifest_provider_not_wired', 'Materialization manifest provider is not wired.'), $force ? 'refresh_all' : 'refresh_due');
 		}
 
 		$registry = $this->getMaterializationRegistry();
 		if ($registry === null) {
-			return $this->buildErrorResponse('Materialization registry is not wired.', $force ? 'refresh_all' : 'refresh_due');
+			return $this->buildErrorResponse($this->t('error_registry_not_wired', 'Materialization registry is not wired.'), $force ? 'refresh_all' : 'refresh_due');
 		}
 
 		$stateStore = $this->getStateStore();
 		if ($stateStore === null) {
-			return $this->buildErrorResponse('State store is not wired.', $force ? 'refresh_all' : 'refresh_due');
+			return $this->buildErrorResponse($this->t('error_state_store_not_wired', 'State store is not wired.'), $force ? 'refresh_all' : 'refresh_due');
 		}
 
 		$service = $this->getMaterializationService();
 		if ($service === null) {
-			return $this->buildErrorResponse('Materialization service is not wired.', $force ? 'refresh_all' : 'refresh_due');
+			return $this->buildErrorResponse($this->t('error_service_not_wired', 'Materialization service is not wired.'), $force ? 'refresh_all' : 'refresh_due');
 		}
 
 		$planner = new MaterializationRefreshPlanner($manifestProvider, $registry, $stateStore);
@@ -291,7 +295,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 				$results[] = new MaterializationRunResult(
 					manifestId: $manifestId,
 					success: false,
-					message: 'Unknown materialization manifest: ' . $manifestId
+					message: $this->t('error_unknown_manifest', 'Unknown materialization manifest: %s', $manifestId)
 				);
 				continue;
 			}
@@ -749,39 +753,39 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 	private function formatDueText(MaterializationManifest $manifest): string {
 		if (!$manifest->enabled) {
-			return 'disabled';
+			return $this->t('status_disabled', 'disabled');
 		}
 
 		$schedule = $manifest->schedule;
 		$policy = strtolower((string)($schedule['policy'] ?? 'interval'));
 
 		if ($policy === 'manual') {
-			return 'manual';
+			return $this->t('schedule_manual', 'manual');
 		}
 
 		if ($policy === 'always') {
-			return 'always due';
+			return $this->t('due_always', 'always due');
 		}
 
 		if ($this->isManifestDue($manifest)) {
-			return 'due';
+			return $this->t('status_due', 'due');
 		}
 
 		$state = $this->getManifestState($manifest);
 		$lastSuccess = (int)($state['last_success_at'] ?? 0);
 
 		if ($lastSuccess <= 0) {
-			return 'pending first run';
+			return $this->t('due_pending_first_run', 'pending first run');
 		}
 
 		if ($policy === 'daily_after') {
-			return 'done today';
+			return $this->t('due_done_today', 'done today');
 		}
 
 		$seconds = (int)($schedule['seconds'] ?? 300);
 		$next = $lastSuccess + ($seconds > 0 ? $seconds : 300);
 
-		return 'next ' . $this->formatTimestamp($next);
+		return $this->t('due_next', 'next %s', $this->formatTimestamp($next));
 	}
 
 	private function formatSchedule(MaterializationManifest $manifest): string {
@@ -789,10 +793,10 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		$policy = strtolower((string)($schedule['policy'] ?? 'interval'));
 
 		return match ($policy) {
-			'always' => 'always',
-			'manual' => 'manual',
-			'daily_after' => 'daily after ' . (string)($schedule['time'] ?? '02:00'),
-			default => 'every ' . (int)($schedule['seconds'] ?? 300) . ' sec'
+			'always' => $this->t('schedule_always', 'always'),
+			'manual' => $this->t('schedule_manual', 'manual'),
+			'daily_after' => $this->t('schedule_daily_after', 'daily after %s', (string)($schedule['time'] ?? '02:00')),
+			default => $this->t('schedule_every_seconds', 'every %d sec', (int)($schedule['seconds'] ?? 300))
 		};
 	}
 
@@ -967,6 +971,24 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		}
 
 		return strtolower($value);
+	}
+
+
+	protected function loadTranslations(): void {
+		$this->view->setPath(DIR_PLUGIN . 'DataHawk');
+		$this->view->loadBricks('Display');
+
+		$translations = $this->view->getBricks('datahawk_materialization_display');
+		$this->translations = is_array($translations) ? $translations : [];
+	}
+
+	protected function t(string $key, string $fallback, mixed ...$values): string {
+		$text = trim((string)($this->translations[$key] ?? ''));
+		if ($text === '') {
+			$text = $fallback;
+		}
+
+		return $values === [] ? $text : vsprintf($text, $values);
 	}
 
 	private function stateKey(string $manifestId, string $suffix): string {
