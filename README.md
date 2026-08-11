@@ -30,6 +30,7 @@ The **DataHawk** plugin extends the BASE3 framework with a schema-driven query e
 ### Schema management
 
 * Schema is provided by an `IQuerySchemaProvider` (default: JSON-based provider)
+* `FileQuerySchemaProvider` loads schema JSON from an explicit directory and is reusable for project/plugin-owned schema areas
 * Table metadata includes joins, tags, categories, domains, default filters
 
 ### Query execution
