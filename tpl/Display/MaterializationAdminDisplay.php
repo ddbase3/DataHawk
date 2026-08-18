@@ -5,6 +5,8 @@ $serviceUrl = (string)$this->_['service'];
 $modularGridCssUrl = (string)$this->_['modularGridCssUrl'];
 $modularGridJsUrl = (string)$this->_['modularGridJsUrl'];
 $translations = is_array($this->_['translations'] ?? null) ? $this->_['translations'] : [];
+$modularGridStrings = $this->getBricks('clientstack_modulargrid');
+$modularGridStrings = is_array($modularGridStrings) ? $modularGridStrings : [];
 $t = static function(string $key, string $fallback) use ($translations): string {
 	$text = trim((string)($translations[$key] ?? ''));
 	return $text !== '' ? $text : $fallback;
@@ -284,6 +286,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 		const VIEW_NAME = <?php echo json_encode($viewName, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 		const MODULAR_GRID_URL = <?php echo json_encode($modularGridJsUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 		const TRANSLATIONS = <?php echo json_encode($translations, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+		const MODULAR_GRID_STRINGS = <?php echo json_encode($modularGridStrings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 
 		function tr(key, fallback) {
 			const value = String(TRANSLATIONS[key] || '').trim();
@@ -887,6 +890,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 			});
 
 			grid = new ModularGrid('#' + definition.rootId, {
+				strings: MODULAR_GRID_STRINGS,
 				layout: buildGridLayout(),
 				adapter,
 				dataMode: 'server',
