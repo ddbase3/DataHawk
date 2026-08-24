@@ -275,7 +275,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 	</p>
 
 	<div class="datahawk-materialization-toolbar">
-		<label for="datahawk-materialization-scope"><?php echo htmlspecialchars($t('scope', 'Scope'), ENT_QUOTES); ?></label>
+		<label for="datahawk-materialization-scope"><?php echo htmlspecialchars($t('reporting_scope', 'Reporting'), ENT_QUOTES); ?></label>
 		<select id="datahawk-materialization-scope" class="datahawk-materialization-scope"></select>
 		<button type="button" class="datahawk-materialization-button" id="datahawk-materialization-reload"><?php echo htmlspecialchars($t('reload', 'Reload'), ENT_QUOTES); ?></button>
 		<button type="button" class="datahawk-materialization-button datahawk-materialization-button-primary" id="datahawk-materialization-refresh-due"><?php echo htmlspecialchars($t('refresh_due', 'Refresh due'), ENT_QUOTES); ?></button>
@@ -426,15 +426,15 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				setOutput(message);
 			}
 
-			const response = await postJson({mode: 'page', scope: activeScope});
+			const response = await postJson({mode: 'page', reportingScope: activeScope});
 
 			if(!response || response.ok !== true) {
 				throw new Error(getText(response && response.error, tr('load_failed_data', 'Failed to load materialization data.')));
 			}
 
 			currentPage = response;
-			activeScope = getText(response.scope, '');
-			renderScopeSelector(response.scopes || [], activeScope);
+			activeScope = getText(response.reportingScope, '');
+			renderScopeSelector(response.reportingScopes || [], activeScope);
 			renderPage(response);
 			await initGrids(response);
 			setOutput(tr('loaded_at', 'Loaded materialization data at %s').replace('%s', getText(new Date().toLocaleString())));
@@ -442,7 +442,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 		async function refreshManifest(scope, manifestId) {
 			setOutput(tr('refreshing_manifest', 'Refreshing %s ...').replace('%s', manifestId));
-			const response = await postJson({mode: 'refresh_manifest', scope, manifestId, buildMode: 'refresh'});
+			const response = await postJson({mode: 'refresh_manifest', reportingScope: activeScope, scope, manifestId, buildMode: 'refresh'});
 
 			if(!response) {
 				throw new Error(tr('no_response', 'No response.'));
@@ -452,8 +452,8 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 			if(page) {
 				currentPage = page;
-				activeScope = getText(page.scope, '');
-				renderScopeSelector(page.scopes || [], activeScope);
+				activeScope = getText(page.reportingScope, '');
+				renderScopeSelector(page.reportingScopes || [], activeScope);
 				renderPage(page);
 				await initGrids(page);
 			}
@@ -467,7 +467,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 		async function refreshDue(force) {
 			setOutput(force ? tr('refreshing_all', 'Refreshing all materializations ...') : tr('refreshing_due', 'Refreshing due materializations ...'));
-			const response = await postJson({mode: force ? 'refresh_all' : 'refresh_due', scope: activeScope});
+			const response = await postJson({mode: force ? 'refresh_all' : 'refresh_due', reportingScope: activeScope});
 
 			if(!response) {
 				throw new Error(tr('no_response', 'No response.'));
@@ -477,8 +477,8 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 			if(page) {
 				currentPage = page;
-				activeScope = getText(page.scope, '');
-				renderScopeSelector(page.scopes || [], activeScope);
+				activeScope = getText(page.reportingScope, '');
+				renderScopeSelector(page.reportingScopes || [], activeScope);
 				renderPage(page);
 				await initGrids(page);
 			}
@@ -495,22 +495,20 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				return;
 			}
 
-			const options = [createElement('option', '', tr('all_scopes', 'All scopes'))];
-			options[0].value = '';
-
+			const options = [];
 			(scopes || []).forEach((scope) => {
-				const value = getText(scope, '');
+				const value = getText(scope && scope.id, '');
 				if(value === '') {
 					return;
 				}
 
-				const option = createElement('option', '', value);
+				const option = createElement('option', '', getText(scope && scope.label, value));
 				option.value = value;
 				options.push(option);
 			});
 
 			scopeElement.replaceChildren(...options);
-			scopeElement.value = selectedScope || '';
+			scopeElement.value = selectedScope || (options[0] ? options[0].value : '');
 		}
 
 		function renderPage(page) {
@@ -589,8 +587,8 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 		function manifestGridDefinition(gridView, detailed = true, title = tr('manifests', 'Manifests'), description = '') {
 			const columns = [
 				{
-					key: 'scope',
-					label: tr('scope', 'Scope'),
+					key: 'reporting_scope_label',
+					label: tr('reporting_scope', 'Reporting'),
 					width: 180,
 					sortType: 'string',
 					render(value) {
@@ -698,8 +696,8 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				pageSize: 50,
 				columns: [
 					{
-						key: 'scope',
-						label: tr('scope', 'Scope'),
+						key: 'reporting_scope_label',
+						label: tr('reporting_scope', 'Reporting'),
 						width: 180,
 						sortType: 'string',
 						render(value) {
@@ -770,8 +768,8 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				pageSize: 50,
 				columns: [
 					{
-						key: 'scope',
-						label: tr('scope', 'Scope'),
+						key: 'reporting_scope_label',
+						label: tr('reporting_scope', 'Reporting'),
 						width: 180,
 						sortType: 'string',
 						render(value) {
@@ -845,8 +843,8 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				pageSize: 50,
 				columns: [
 					{
-						key: 'scope',
-						label: tr('scope', 'Scope'),
+						key: 'reporting_scope_label',
+						label: tr('reporting_scope', 'Reporting'),
 						width: 180,
 						sortType: 'string',
 						render(value) {
@@ -947,7 +945,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 					return {
 						mode: 'grid',
-						scope: activeScope,
+						reportingScope: activeScope,
 						gridView: definition.gridView,
 						page: request.page || 1,
 						pageSize: request.pageSize || definition.pageSize || 50,

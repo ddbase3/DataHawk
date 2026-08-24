@@ -53,6 +53,8 @@ Relevant contribution contracts are:
 - `IQuerySchemaDefinitionProvider` for one source-schema scope
 - `IMaterializationDefinitionProvider` for one materialization target scope
 
-The central DataHawk provider exposes the combined runtime through `IScopedQuerySchemaProvider` and `IScopedMaterializationManifestProvider`. Scope is part of table and manifest identity. A qualified identity uses `scope:table` or `scope:manifest`.
+The central DataHawk provider exposes the combined runtime through `IScopedQuerySchemaProvider` and `IScopedMaterializationManifestProvider`. Technical scope is part of table and manifest identity. A qualified identity uses `scope:table` or `scope:manifest`.
 
-A feature plugin may load its definitions from `ISettingsStore`, files, or another backend. DataHawk consumes only the ResourceFoundation provider contract and does not own that storage choice.
+User-facing reporting administration does not expose those technical scopes directly. Feature plugins also contribute `IReportingScopeDefinitionProvider`, which groups their query, materialization, and report scopes under one reporting label. DataHawk exposes those definitions through `IReportingScopeRegistry` for administration and execution filters.
+
+A feature plugin may load its definitions from `ISettingsStore`, files, or another backend. DataHawk consumes only the ResourceFoundation provider contracts and does not own that storage choice.

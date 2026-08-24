@@ -33,6 +33,7 @@ The **DataHawk** plugin extends the BASE3 framework with a schema-driven query e
 * DataHawk aggregates independent schema scopes contributed through ResourceFoundation `IQuerySchemaDefinitionProvider` implementations.
 * Materialization definition scopes contributed through `IMaterializationDefinitionProvider` participate in the same query-schema namespace.
 * `IScopedQuerySchemaProvider` exposes scope enumeration and scope-specific schema access for administration and diagnostics.
+* `IReportingScopeRegistry` maps those technical scopes to user-facing reporting areas contributed through ResourceFoundation `IReportingScopeDefinitionProvider`.
 * `FileQuerySchemaProvider` remains available for direct file-backed use, but project plugins no longer need to compose the central provider manually.
 * Table metadata includes joins, tags, categories, domains, default filters.
 

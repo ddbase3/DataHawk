@@ -30,6 +30,7 @@ use DataHawk\Materialization\DatabaseMaterializationRegistry;
 use DataHawk\Materialization\DefaultMaterializationService;
 use DataHawk\Materialization\MaterializationPhysicalTableNameGenerator;
 use DataHawk\Materialization\MaterializationTableNameResolver;
+use DataHawk\Reporting\ReportingScopeRegistry;
 use DataHawk\Schema\CompositeQuerySchemaProvider;
 use DataHawk\Schema\DataHawkQuerySchemaProviderRegistry;
 use DataHawk\Service\DefaultReportQueryService;
@@ -42,6 +43,7 @@ use ResourceFoundation\Api\IMaterializationService;
 use ResourceFoundation\Api\IQueryCompiler;
 use ResourceFoundation\Api\IQuerySchemaProvider;
 use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Api\IReportingScopeRegistry;
 use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
 use ResourceFoundation\Api\IScopedQuerySchemaProvider;
 use ResourceFoundation\Api\ITableNameResolver;
@@ -62,6 +64,11 @@ class DataHawkPlugin implements IPlugin, ICheck {
 
                 $this->container
                         ->set(self::getName(), $this, IContainer::SHARED)
+
+                        ->set(
+                                IReportingScopeRegistry::class,
+                                fn($c) => new ReportingScopeRegistry($c->get(IClassMap::class)),
+                                IContainer::SHARED | IContainer::NOOVERWRITE)
 
                         ->set(
                                 DataHawkQuerySchemaProviderRegistry::class,

@@ -30,9 +30,11 @@ use DataHawk\Materialization\MaterializationRefreshPlanner;
 use ResourceFoundation\Api\IMaterializationManifestProvider;
 use ResourceFoundation\Api\IMaterializationRegistry;
 use ResourceFoundation\Api\IMaterializationService;
+use ResourceFoundation\Api\IReportingScopeRegistry;
 use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
 use ResourceFoundation\Dto\MaterializationManifest;
 use ResourceFoundation\Dto\MaterializationRunResult;
+use ResourceFoundation\Dto\ReportingScopeDefinition;
 use Throwable;
 
 abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
@@ -52,7 +54,8 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		private readonly IMvcView $view,
 		private readonly IAssetResolver $assetResolver,
 		private readonly ILinkTargetService $linkTargetService,
-		private readonly IDatabase $database
+		private readonly IDatabase $database,
+		private readonly IReportingScopeRegistry $reportingScopeRegistry
 	) {}
 
 	public function setData($data) {
@@ -128,31 +131,31 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	private function buildJsonResponse(): array {
 		$payload = $this->request->getJsonBody();
 
-		if (!is_array($payload)) {
+		if(!is_array($payload)) {
 			$payload = [];
 		}
 
 		$mode = $this->readString($payload, 'mode', 'page');
 
-		if ($mode === 'grid') {
+		if($mode === 'grid') {
 			return $this->buildGridResponse($payload);
 		}
 
-		if ($mode === 'refresh_manifest') {
+		if($mode === 'refresh_manifest') {
 			return $this->buildRefreshManifestResponse($payload);
 		}
 
-		$scope = $this->readString($payload, 'scope');
+		$reportingScope = $this->readString($payload, 'reportingScope');
 
-		if ($mode === 'refresh_due') {
-			return $this->buildRefreshDueResponse(false, $scope);
+		if($mode === 'refresh_due') {
+			return $this->buildRefreshDueResponse(false, $reportingScope);
 		}
 
-		if ($mode === 'refresh_all') {
-			return $this->buildRefreshDueResponse(true, $scope);
+		if($mode === 'refresh_all') {
+			return $this->buildRefreshDueResponse(true, $reportingScope);
 		}
 
-		return $this->buildPageResponse($scope);
+		return $this->buildPageResponse($reportingScope);
 	}
 
 	/**
@@ -161,8 +164,8 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	 */
 	private function buildGridResponse(array $payload): array {
 		$gridView = $this->readString($payload, 'gridView', $this->getViewName());
-		$scope = $this->readString($payload, 'scope');
-		$rows = $this->loadGridRows($gridView, $scope);
+		$reportingScope = $this->readString($payload, 'reportingScope');
+		$rows = $this->loadGridRows($gridView, $reportingScope);
 		$search = $this->readString($payload, 'search');
 		$filters = $this->normalizeGridFilters($payload['filters'] ?? null);
 		$sort = $this->normalizeGridSort($payload['sort'] ?? null, $payload);
@@ -198,38 +201,36 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadGridRows(string $gridView, string $scope = ''): array {
-		return match ($gridView) {
-			'overview_due' => array_values(array_filter($this->loadManifestRows($scope), fn(array $row) => (bool)($row['is_due'] ?? false))),
-			'overview_manifests', 'manifests' => $this->loadManifestRows($scope),
-			'overview_runs', 'runs' => $this->loadRunRows($scope),
-			'registry' => $this->loadRegistryRows($scope),
-			'tables' => $this->loadTableRows($scope),
-			default => $this->loadManifestRows($scope),
+	private function loadGridRows(string $gridView, string $reportingScope = ''): array {
+		return match($gridView) {
+			'overview_due' => array_values(array_filter($this->loadManifestRows($reportingScope), fn(array $row) => (bool)($row['is_due'] ?? false))),
+			'overview_manifests', 'manifests' => $this->loadManifestRows($reportingScope),
+			'overview_runs', 'runs' => $this->loadRunRows($reportingScope),
+			'registry' => $this->loadRegistryRows($reportingScope),
+			'tables' => $this->loadTableRows($reportingScope),
+			default => $this->loadManifestRows($reportingScope),
 		};
 	}
 
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function buildPageResponse(string $scope = ''): array {
-		$scopes = $this->loadScopes();
-		if($scope !== '' && !in_array($scope, $scopes, true)) {
-			$scope = '';
-		}
+	private function buildPageResponse(string $reportingScope = ''): array {
+		$scope = $this->resolveReportingScope($reportingScope);
+		$reportingScope = $scope?->id ?? '';
 
 		return [
 			'ok' => true,
 			'mode' => 'page',
 			'view' => $this->getViewName(),
 			'generated_at' => time(),
-			'scope' => $scope,
-			'scopes' => $scopes,
-			'overview' => $this->buildOverview($scope),
-			'manifests' => $this->loadManifestRows($scope),
-			'registry' => $this->loadRegistryRows($scope),
-			'runs' => $this->loadRunRows($scope),
-			'tables' => $this->loadTableRows($scope),
+			'reportingScope' => $reportingScope,
+			'reportingScopes' => $this->formatReportingScopes(),
+			'overview' => $this->buildOverview($reportingScope),
+			'manifests' => $this->loadManifestRows($reportingScope),
+			'registry' => $this->loadRegistryRows($reportingScope),
+			'runs' => $this->loadRunRows($reportingScope),
+			'tables' => $this->loadTableRows($reportingScope),
 		];
 	}
 
@@ -239,32 +240,39 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	 */
 	private function buildRefreshManifestResponse(array $payload): array {
 		$manifestId = $this->readString($payload, 'manifestId');
-		$scope = $this->readString($payload, 'scope');
+		$reportingScopeId = $this->readString($payload, 'reportingScope');
+		$materializationScope = $this->readString($payload, 'scope');
 		$mode = $this->normalizeBuildMode($this->readString($payload, 'buildMode', 'refresh'));
 
-		if ($manifestId === '') {
+		if($manifestId === '') {
 			return $this->buildErrorResponse($this->t('error_missing_manifest_id', 'Missing materialization manifest id.'), 'refresh_manifest');
 		}
 
-		$manifestProvider = $this->getManifestProvider();
-		if ($manifestProvider === null) {
-			return $this->buildErrorResponse($this->t('error_manifest_provider_not_wired', 'Materialization manifest provider is not wired.'), 'refresh_manifest');
+		$reportingScope = $this->resolveReportingScope($reportingScopeId);
+		if($reportingScope === null) {
+			return $this->buildErrorResponse($this->t('error_unknown_reporting_scope', 'Unknown reporting scope: %s', $reportingScopeId), 'refresh_manifest');
 		}
 
-		$manifest = $scope !== '' && $manifestProvider instanceof IScopedMaterializationManifestProvider
-			? $manifestProvider->getManifestForScope($scope, $manifestId)
-			: $manifestProvider->getManifest($manifestId);
-		if ($manifest === null) {
+		if($materializationScope === '' || !in_array($materializationScope, $reportingScope->materializationScopes, true)) {
+			return $this->buildErrorResponse($this->t('error_unknown_scope', 'Unknown materialization scope: %s', $materializationScope), 'refresh_manifest');
+		}
+
+		$manifestProvider = $this->getManifestProvider();
+		if(!$manifestProvider instanceof IScopedMaterializationManifestProvider) {
+			return $this->buildErrorResponse($this->t('error_scope_not_supported', 'Materialization scopes are not supported.'), 'refresh_manifest');
+		}
+
+		$manifest = $manifestProvider->getManifestForScope($materializationScope, $manifestId);
+		if($manifest === null) {
 			return $this->buildErrorResponse($this->t('error_unknown_manifest', 'Unknown materialization manifest: %s', $manifestId), 'refresh_manifest');
 		}
 
 		$service = $this->getMaterializationService();
-		if ($service === null) {
+		if($service === null) {
 			return $this->buildErrorResponse($this->t('error_service_not_wired', 'Materialization service is not wired.'), 'refresh_manifest');
 		}
 
-		$serviceManifestId = $scope !== '' ? $scope . ':' . $manifestId : $manifestId;
-		$result = $this->refreshManifest($service, $serviceManifestId, $mode);
+		$result = $this->refreshManifest($service, $materializationScope . ':' . $manifestId, $mode);
 		$this->markManualResult($manifest, $result);
 
 		return [
@@ -272,67 +280,69 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 			'mode' => 'refresh_manifest',
 			'buildMode' => $mode,
 			'result' => $this->formatRunResult($result),
-			'page' => $this->buildPageResponse($scope),
+			'page' => $this->buildPageResponse($reportingScope->id),
 		];
 	}
 
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function buildRefreshDueResponse(bool $force, string $scope = ''): array {
+	private function buildRefreshDueResponse(bool $force, string $reportingScopeId = ''): array {
 		$manifestProvider = $this->getManifestProvider();
-		if ($manifestProvider === null) {
-			return $this->buildErrorResponse($this->t('error_manifest_provider_not_wired', 'Materialization manifest provider is not wired.'), $force ? 'refresh_all' : 'refresh_due');
+		if(!$manifestProvider instanceof IScopedMaterializationManifestProvider) {
+			return $this->buildErrorResponse($this->t('error_scope_not_supported', 'Materialization scopes are not supported.'), $force ? 'refresh_all' : 'refresh_due');
 		}
 
 		$registry = $this->getMaterializationRegistry();
-		if ($registry === null) {
+		if($registry === null) {
 			return $this->buildErrorResponse($this->t('error_registry_not_wired', 'Materialization registry is not wired.'), $force ? 'refresh_all' : 'refresh_due');
 		}
 
 		$stateStore = $this->getStateStore();
-		if ($stateStore === null) {
+		if($stateStore === null) {
 			return $this->buildErrorResponse($this->t('error_state_store_not_wired', 'State store is not wired.'), $force ? 'refresh_all' : 'refresh_due');
 		}
 
 		$service = $this->getMaterializationService();
-		if ($service === null) {
+		if($service === null) {
 			return $this->buildErrorResponse($this->t('error_service_not_wired', 'Materialization service is not wired.'), $force ? 'refresh_all' : 'refresh_due');
+		}
+
+		$reportingScope = $this->resolveReportingScope($reportingScopeId);
+		if($reportingScope === null) {
+			return $this->buildErrorResponse($this->t('error_unknown_reporting_scope', 'Unknown reporting scope: %s', $reportingScopeId), $force ? 'refresh_all' : 'refresh_due');
 		}
 
 		$planner = new MaterializationRefreshPlanner($manifestProvider, $registry, $stateStore);
 		$configuredManifestIds = [];
-		if($scope !== '') {
-			if(!$manifestProvider instanceof IScopedMaterializationManifestProvider) {
-				return $this->buildErrorResponse($this->t('error_scope_not_supported', 'Materialization scopes are not supported.'), $force ? 'refresh_all' : 'refresh_due');
+
+		foreach($reportingScope->materializationScopes as $materializationScope) {
+			if(!in_array($materializationScope, $manifestProvider->getScopes(), true)) {
+				continue;
 			}
 
-			if(!in_array($scope, $manifestProvider->getScopes(), true)) {
-				return $this->buildErrorResponse($this->t('error_unknown_scope', 'Unknown materialization scope: %s', $scope), $force ? 'refresh_all' : 'refresh_due');
-			}
-
-			$configuredManifestIds = array_map(
-				fn(MaterializationManifest $manifest) => $scope . ':' . $manifest->id,
-				$manifestProvider->getManifestsForScope($scope)
-			);
-
-			if($configuredManifestIds === []) {
-				return [
-					'ok' => true,
-					'mode' => $force ? 'refresh_all' : 'refresh_due',
-					'force' => $force,
-					'manifestIds' => [],
-					'results' => [],
-					'page' => $this->buildPageResponse($scope),
-				];
+			foreach($manifestProvider->getManifestsForScope($materializationScope) as $manifest) {
+				$configuredManifestIds[] = $materializationScope . ':' . $manifest->id;
 			}
 		}
+
+		if($configuredManifestIds === []) {
+			return [
+				'ok' => true,
+				'mode' => $force ? 'refresh_all' : 'refresh_due',
+				'force' => $force,
+				'manifestIds' => [],
+				'results' => [],
+				'page' => $this->buildPageResponse($reportingScope->id),
+			];
+		}
+
 		$manifestIds = $planner->getManifestIdsToRefresh($configuredManifestIds, $force);
 		$results = [];
 
-		foreach ($manifestIds as $manifestId) {
+		foreach($manifestIds as $manifestId) {
 			$manifest = $planner->getManifest($manifestId);
-			if ($manifest === null) {
+			if($manifest === null) {
 				$results[] = new MaterializationRunResult(
 					manifestId: $manifestId,
 					success: false,
@@ -357,18 +367,18 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 			'force' => $force,
 			'manifestIds' => $manifestIds,
 			'results' => array_map(fn(MaterializationRunResult $result) => $this->formatRunResult($result), $results),
-			'page' => $this->buildPageResponse($scope),
+			'page' => $this->buildPageResponse($reportingScope->id),
 		];
 	}
 
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function buildOverview(string $scope = ''): array {
-		$manifests = $this->loadManifestRows($scope);
-		$registry = $this->loadRegistryRows($scope);
-		$runs = $this->loadRunRows($scope);
-		$tables = $this->loadTableRows($scope);
+	private function buildOverview(string $reportingScope = ''): array {
+		$manifests = $this->loadManifestRows($reportingScope);
+		$registry = $this->loadRegistryRows($reportingScope);
+		$runs = $this->loadRunRows($reportingScope);
+		$tables = $this->loadTableRows($reportingScope);
 
 		$currentRegistry = array_values(array_filter($registry, fn(array $row) => (int)($row['is_current'] ?? 0) === 1));
 		$failedRuns = array_values(array_filter($runs, fn(array $row) => (string)($row['status'] ?? '') === 'failed'));
@@ -390,50 +400,51 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadManifestRows(string $scope = ''): array {
+	private function loadManifestRows(string $reportingScope = ''): array {
 		$provider = $this->getManifestProvider();
-		if ($provider === null) {
+		$scopeDefinition = $this->resolveReportingScope($reportingScope);
+		if(!$provider instanceof IScopedMaterializationManifestProvider || $scopeDefinition === null) {
 			return [];
 		}
 
-		$manifests = $scope !== '' && $provider instanceof IScopedMaterializationManifestProvider
-			? $provider->getManifestsForScope($scope)
-			: $provider->getManifests();
-
 		$rows = [];
-		foreach ($manifests as $manifest) {
-			$current = $this->getCurrentGeneration($manifest);
-			$state = $this->getManifestState($manifest);
+		foreach($scopeDefinition->materializationScopes as $materializationScope) {
+			foreach($provider->getManifestsForScope($materializationScope) as $manifest) {
+				$current = $this->getCurrentGeneration($manifest);
+				$state = $this->getManifestState($manifest);
 
-			$rows[] = [
-				'id' => $manifest->id,
-				'scope' => $manifest->targetSchema,
-				'enabled' => $manifest->enabled,
-				'priority' => $manifest->priority,
-				'source_schema' => $manifest->sourceSchema,
-				'target_schema' => $manifest->targetSchema,
-				'logical_table' => $manifest->logicalTable,
-				'physical_prefix' => $manifest->physicalPrefix,
-				'refresh_mode' => (string)($manifest->refresh['mode'] ?? 'full'),
-				'schedule_policy' => (string)($manifest->schedule['policy'] ?? 'interval'),
-				'schedule_text' => $this->formatSchedule($manifest),
-				'dependency_refresh' => $manifest->dependencyRefresh,
-				'depends_on' => $manifest->dependsOn,
-				'columns' => count($manifest->columns),
-				'indexes' => count($manifest->indexes),
-				'is_due' => $this->isManifestDue($manifest),
-				'due_text' => $this->formatDueText($manifest),
-				'last_success_at' => $state['last_success_at'],
-				'last_success_text' => $this->formatTimestamp($state['last_success_at']),
-				'last_status' => $state['last_status'],
-				'last_message' => $state['last_message'],
-				'last_row_count' => $state['last_row_count'],
-				'current_physical_table' => $current?->physicalTable ?? '',
-				'current_row_count' => $current?->rowCount,
-				'current_generation' => $current?->generation ?? '',
-				'published_at' => $current?->publishedAt,
-				'published_text' => $this->formatTimestamp($current?->publishedAt),
-			];
+				$rows[] = [
+					'id' => $manifest->id,
+					'scope' => $materializationScope,
+					'reporting_scope' => $scopeDefinition->id,
+					'reporting_scope_label' => $scopeDefinition->label,
+					'enabled' => $manifest->enabled,
+					'priority' => $manifest->priority,
+					'source_schema' => $manifest->sourceSchema,
+					'target_schema' => $manifest->targetSchema,
+					'logical_table' => $manifest->logicalTable,
+					'physical_prefix' => $manifest->physicalPrefix,
+					'refresh_mode' => (string)($manifest->refresh['mode'] ?? 'full'),
+					'schedule_policy' => (string)($manifest->schedule['policy'] ?? 'interval'),
+					'schedule_text' => $this->formatSchedule($manifest),
+					'dependency_refresh' => $manifest->dependencyRefresh,
+					'depends_on' => $manifest->dependsOn,
+					'columns' => count($manifest->columns),
+					'indexes' => count($manifest->indexes),
+					'is_due' => $this->isManifestDue($manifest),
+					'due_text' => $this->formatDueText($manifest),
+					'last_success_at' => $state['last_success_at'],
+					'last_success_text' => $this->formatTimestamp($state['last_success_at']),
+					'last_status' => $state['last_status'],
+					'last_message' => $state['last_message'],
+					'last_row_count' => $state['last_row_count'],
+					'current_physical_table' => $current?->physicalTable ?? '',
+					'current_row_count' => $current?->rowCount,
+					'current_generation' => $current?->generation ?? '',
+					'published_at' => $current?->publishedAt,
+					'published_text' => $this->formatTimestamp($current?->publishedAt),
+				];
+			}
 		}
 
 		usort($rows, fn(array $a, array $b) => ((int)$a['priority'] <=> (int)$b['priority']) ?: strnatcasecmp((string)$a['id'], (string)$b['id']));
@@ -444,89 +455,112 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadRegistryRows(string $scope = ''): array {
-		if (!$this->tableExists('base3_mat_registry')) {
+	private function loadRegistryRows(string $reportingScope = ''): array {
+		if(!$this->tableExists('base3_mat_registry')) {
 			return [];
 		}
 
-		$where = $scope !== '' ? " WHERE schema_name = '" . $this->database->escape($scope) . "'" : '';
+		$scopeDefinition = $this->resolveReportingScope($reportingScope);
+		if($scopeDefinition === null || $scopeDefinition->materializationScopes === []) {
+			return [];
+		}
+
+		$where = $this->buildSchemaNameWhereClause($scopeDefinition->materializationScopes);
 		$rows = $this->database->multiQuery(
 			'SELECT id, schema_name, logical_table, physical_table, generation, row_count, status, is_current, published_at, created_at, meta_json ' .
 			'FROM `base3_mat_registry`' . $where . ' ORDER BY logical_table ASC, is_current DESC, published_at DESC, id DESC'
 		);
 
-		return array_map(fn(array $row) => $this->normalizeRegistryRow($row), $rows);
+		return array_map(function(array $row) use ($scopeDefinition): array {
+			$row = $this->normalizeRegistryRow($row);
+			$row['reporting_scope'] = $scopeDefinition->id;
+			$row['reporting_scope_label'] = $scopeDefinition->label;
+			return $row;
+		}, $rows);
 	}
 
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadRunRows(string $scope = ''): array {
-		if (!$this->tableExists('base3_mat_run')) {
+	private function loadRunRows(string $reportingScope = ''): array {
+		if(!$this->tableExists('base3_mat_run')) {
 			return [];
 		}
 
-		$where = $scope !== '' ? " WHERE schema_name = '" . $this->database->escape($scope) . "'" : '';
+		$scopeDefinition = $this->resolveReportingScope($reportingScope);
+		if($scopeDefinition === null || $scopeDefinition->materializationScopes === []) {
+			return [];
+		}
+
+		$where = $this->buildSchemaNameWhereClause($scopeDefinition->materializationScopes);
 		$rows = $this->database->multiQuery(
 			'SELECT id, manifest_id, schema_name, logical_table, physical_table, generation, mode, status, message, row_count, started_at, finished_at, meta_json ' .
 			'FROM `base3_mat_run`' . $where . ' ORDER BY id DESC'
 		);
 
-		return array_map(fn(array $row) => $this->normalizeRunRow($row), $rows);
+		return array_map(function(array $row) use ($scopeDefinition): array {
+			$row = $this->normalizeRunRow($row);
+			$row['reporting_scope'] = $scopeDefinition->id;
+			$row['reporting_scope_label'] = $scopeDefinition->label;
+			return $row;
+		}, $rows);
 	}
 
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadTableRows(string $scope = ''): array {
+	private function loadTableRows(string $reportingScope = ''): array {
 		$this->database->connect();
-		if (!$this->database->connected()) {
+		if(!$this->database->connected()) {
 			return [];
 		}
 
-		$rows = $this->database->multiQuery("SHOW TABLES LIKE 'base3\\_mat\\_%'");
-		$registry = $this->loadRegistryRows($scope);
+		$scopeDefinition = $this->resolveReportingScope($reportingScope);
+		if($scopeDefinition === null || $scopeDefinition->materializationScopes === []) {
+			return [];
+		}
+
+		$rows = $this->database->multiQuery("SHOW TABLES LIKE 'base3\_mat\_%'");
+		$registry = $this->loadRegistryRows($scopeDefinition->id);
 		$currentByPhysical = [];
 		$registeredByPhysical = [];
 
-		foreach ($registry as $registryRow) {
+		foreach($registry as $registryRow) {
 			$physicalTable = (string)($registryRow['physical_table'] ?? '');
-			if ($physicalTable === '') {
+			if($physicalTable === '') {
 				continue;
 			}
 
 			$registeredByPhysical[$physicalTable] = $registryRow;
-			if ((int)($registryRow['is_current'] ?? 0) === 1) {
+			if((int)($registryRow['is_current'] ?? 0) === 1) {
 				$currentByPhysical[$physicalTable] = $registryRow;
 			}
 		}
 
 		$result = [];
-		foreach ($rows as $row) {
+		foreach($rows as $row) {
 			$tableName = $this->firstRowValue($row);
-			if ($tableName === '') {
-				continue;
-			}
-
-			if (in_array($tableName, self::TECHNICAL_TABLES, true)) {
+			if($tableName === '' || in_array($tableName, self::TECHNICAL_TABLES, true)) {
 				continue;
 			}
 
 			$registryRow = $registeredByPhysical[$tableName] ?? null;
-			$currentRow = $currentByPhysical[$tableName] ?? null;
-			if($scope !== '' && $registryRow === null) {
+			if($registryRow === null) {
 				continue;
 			}
 
+			$currentRow = $currentByPhysical[$tableName] ?? null;
 			$result[] = [
 				'table_name' => $tableName,
 				'scope' => (string)($registryRow['schema_name'] ?? ''),
+				'reporting_scope' => $scopeDefinition->id,
+				'reporting_scope_label' => $scopeDefinition->label,
 				'logical_table' => (string)($registryRow['logical_table'] ?? ''),
 				'schema_name' => (string)($registryRow['schema_name'] ?? ''),
 				'generation' => (string)($registryRow['generation'] ?? ''),
 				'row_count' => $registryRow['row_count'] ?? null,
 				'is_current' => $currentRow !== null,
-				'is_registered' => $registryRow !== null,
+				'is_registered' => true,
 				'published_at' => $registryRow['published_at'] ?? null,
 				'published_text' => $this->formatTimestamp(isset($registryRow['published_at']) ? (int)$registryRow['published_at'] : null),
 			];
@@ -938,30 +972,48 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return string[]
 	 */
-	private function loadScopes(): array {
-		$scopes = [];
-		$provider = $this->getManifestProvider();
-		if($provider instanceof IScopedMaterializationManifestProvider) {
-			$scopes = $provider->getScopes();
+	private function resolveReportingScope(string $id = ''): ?ReportingScopeDefinition {
+		$id = trim($id);
+		if($id !== '') {
+			return $this->reportingScopeRegistry->get($id);
 		}
 
-		foreach($this->loadRegistryRows() as $row) {
-			$scope = trim((string)($row['scope'] ?? ''));
-			if($scope !== '') {
-				$scopes[] = $scope;
+		$scopes = $this->reportingScopeRegistry->getScopes();
+		return $scopes === [] ? null : reset($scopes);
+	}
+
+	/**
+	 * @return array<int,array{id:string,label:string}>
+	 */
+	private function formatReportingScopes(): array {
+		return array_map(
+			fn(ReportingScopeDefinition $scope) => [
+				'id' => $scope->id,
+				'label' => $scope->label,
+			],
+			$this->reportingScopeRegistry->getScopes()
+		);
+	}
+
+	/**
+	 * @param string[] $scopes
+	 */
+	private function buildSchemaNameWhereClause(array $scopes): string {
+		$values = [];
+		foreach($scopes as $scope) {
+			$scope = trim($scope);
+			if($scope === '') {
+				continue;
 			}
+
+			$values[] = "'" . $this->database->escape($scope) . "'";
 		}
 
-		foreach($this->loadRunRows() as $row) {
-			$scope = trim((string)($row['scope'] ?? ''));
-			if($scope !== '') {
-				$scopes[] = $scope;
-			}
+		if($values === []) {
+			return ' WHERE 1 = 0';
 		}
 
-		$scopes = array_values(array_unique($scopes));
-		sort($scopes);
-		return $scopes;
+		return ' WHERE schema_name IN (' . implode(', ', $values) . ')';
 	}
 
 	private function getManifestProvider(): ?IMaterializationManifestProvider {
