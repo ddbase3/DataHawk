@@ -17,7 +17,7 @@
 namespace DataHawk\Materialization;
 
 use Base3\Database\Api\IDatabase;
-use Base3\Settings\Api\ISettingsStore;
+use ResourceFoundation\Api\IMaterializationDefinitionProvider;
 use ResourceFoundation\Api\IMaterializationSchemaProvider;
 use ResourceFoundation\Dto\FieldMetadata;
 use ResourceFoundation\Dto\ForeignKeyReference;
@@ -25,7 +25,7 @@ use ResourceFoundation\Dto\JoinMetadata;
 use ResourceFoundation\Dto\MaterializationManifest;
 use ResourceFoundation\Dto\TableMetadata;
 
-final class SettingsMaterializationSchemaProvider implements IMaterializationSchemaProvider {
+final class DefinitionMaterializationSchemaProvider implements IMaterializationSchemaProvider {
 
 	/** @var array<string,MaterializationManifest>|null */
 	private ?array $manifests = null;
@@ -40,8 +40,7 @@ final class SettingsMaterializationSchemaProvider implements IMaterializationSch
 	private array $tableExistsCache = [];
 
 	public function __construct(
-		private readonly ISettingsStore $settingsStore,
-		private readonly string $group,
+		private readonly IMaterializationDefinitionProvider $definitionProvider,
 		private readonly ?IDatabase $database = null
 	) {}
 
@@ -102,7 +101,7 @@ final class SettingsMaterializationSchemaProvider implements IMaterializationSch
 			return $this->manifests;
 		}
 
-		$datasets = $this->settingsStore->getGroup($this->group);
+		$datasets = $this->definitionProvider->getDefinitions();
 		ksort($datasets);
 
 		$manifests = [];
@@ -130,6 +129,11 @@ final class SettingsMaterializationSchemaProvider implements IMaterializationSch
 			$data = $this->applyConditionalQueryParts($data);
 			$manifest = MaterializationManifest::fromArray($data);
 			$this->validateManifest($manifest, (string)$name);
+			if($manifest->targetSchema !== $this->definitionProvider->getScope()) {
+				throw new \RuntimeException(
+					'Materialization target schema must match provider scope ' . $this->definitionProvider->getScope() . ': ' . (string)$name
+				);
+			}
 
 			$variantPriority = $this->getVariantPriority($data);
 			$currentPriority = $manifestPriorities[$manifest->id] ?? PHP_INT_MIN;

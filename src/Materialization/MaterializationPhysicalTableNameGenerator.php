@@ -32,6 +32,11 @@ class MaterializationPhysicalTableNameGenerator {
 		}
 
 		$name = $manifest->logicalTable !== '' ? $manifest->logicalTable : $manifest->id;
+		$scope = trim($manifest->targetSchema);
+		if($scope !== '') {
+			$name = $scope . '_' . $name;
+		}
+
 		return $this->normalizePrefix($this->defaultPrefix . $name);
 	}
 

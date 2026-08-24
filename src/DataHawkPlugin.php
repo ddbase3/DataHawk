@@ -22,18 +22,17 @@ use Base3\Api\ICheck;
 use Base3\Api\IClassMap;
 use Base3\Api\IContainer;
 use Base3\Api\IPlugin;
-use Base3\Configuration\Api\IConfiguration;
 use Base3\Database\Api\IDatabase;
 use DataHawk\Api\IReportExporterFactory;
-use DataHawk\Service\DefaultReportQueryService;
-use DataHawk\Schema\DefaultReportSchemaProvider;
-use DataHawk\Compiler\DefaultTableNameResolver;
 use DataHawk\Compiler\MysqlReportQueryCompiler;
+use DataHawk\Materialization\CompositeMaterializationSchemaProvider;
 use DataHawk\Materialization\DatabaseMaterializationRegistry;
 use DataHawk\Materialization\DefaultMaterializationService;
-use DataHawk\Materialization\ManifestMaterializationSchemaProvider;
 use DataHawk\Materialization\MaterializationPhysicalTableNameGenerator;
 use DataHawk\Materialization\MaterializationTableNameResolver;
+use DataHawk\Schema\CompositeQuerySchemaProvider;
+use DataHawk\Schema\DataHawkQuerySchemaProviderRegistry;
+use DataHawk\Service\DefaultReportQueryService;
 use DataHawk\Service\ReportExporterFactory;
 use ResourceFoundation\Api\IMaterializationManifestProvider;
 use ResourceFoundation\Api\IMaterializationRegistry;
@@ -41,9 +40,11 @@ use ResourceFoundation\Api\IMaterializationRunRepository;
 use ResourceFoundation\Api\IMaterializationSchemaProvider;
 use ResourceFoundation\Api\IMaterializationService;
 use ResourceFoundation\Api\IQueryCompiler;
-use ResourceFoundation\Api\ITableNameResolver;
 use ResourceFoundation\Api\IQuerySchemaProvider;
 use ResourceFoundation\Api\IQueryService;
+use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
+use ResourceFoundation\Api\IScopedQuerySchemaProvider;
+use ResourceFoundation\Api\ITableNameResolver;
 
 class DataHawkPlugin implements IPlugin, ICheck {
 
@@ -63,10 +64,27 @@ class DataHawkPlugin implements IPlugin, ICheck {
                         ->set(self::getName(), $this, IContainer::SHARED)
 
                         ->set(
-                                IQuerySchemaProvider::class,
-                                fn($c) => new DefaultReportSchemaProvider(
-                                        $c->get(IConfiguration::class)),
+                                DataHawkQuerySchemaProviderRegistry::class,
+                                fn($c) => new DataHawkQuerySchemaProviderRegistry(
+                                        $c->get(IClassMap::class),
+                                        $c->get(IDatabase::class)),
                                 IContainer::SHARED | IContainer::NOOVERWRITE)
+
+                        ->set(
+                                CompositeQuerySchemaProvider::class,
+                                fn($c) => new CompositeQuerySchemaProvider(
+                                        $c->get(DataHawkQuerySchemaProviderRegistry::class)),
+                                IContainer::SHARED | IContainer::NOOVERWRITE)
+
+                        ->set(
+                                IQuerySchemaProvider::class,
+                                CompositeQuerySchemaProvider::class,
+                                IContainer::ALIAS | IContainer::NOOVERWRITE)
+
+                        ->set(
+                                IScopedQuerySchemaProvider::class,
+                                CompositeQuerySchemaProvider::class,
+                                IContainer::ALIAS | IContainer::NOOVERWRITE)
 
                         ->set(
                                 IMaterializationRegistry::class,
@@ -80,21 +98,24 @@ class DataHawkPlugin implements IPlugin, ICheck {
                                 IContainer::SHARED | IContainer::NOOVERWRITE)
 
                         ->set(
-                                ManifestMaterializationSchemaProvider::class,
-                                fn($c) => new ManifestMaterializationSchemaProvider(
-                                        dirname(__DIR__) . '/local/DataHawk/materialized',
-                                        $c->get(IDatabase::class)
-                                ),
+                                CompositeMaterializationSchemaProvider::class,
+                                fn($c) => new CompositeMaterializationSchemaProvider(
+                                        $c->get(DataHawkQuerySchemaProviderRegistry::class)),
                                 IContainer::SHARED | IContainer::NOOVERWRITE)
 
                         ->set(
                                 IMaterializationManifestProvider::class,
-                                ManifestMaterializationSchemaProvider::class,
+                                CompositeMaterializationSchemaProvider::class,
+                                IContainer::ALIAS | IContainer::NOOVERWRITE)
+
+                        ->set(
+                                IScopedMaterializationManifestProvider::class,
+                                CompositeMaterializationSchemaProvider::class,
                                 IContainer::ALIAS | IContainer::NOOVERWRITE)
 
                         ->set(
                                 IMaterializationSchemaProvider::class,
-                                ManifestMaterializationSchemaProvider::class,
+                                CompositeMaterializationSchemaProvider::class,
                                 IContainer::ALIAS | IContainer::NOOVERWRITE)
 
                         ->set(
@@ -122,7 +143,7 @@ class DataHawkPlugin implements IPlugin, ICheck {
 
                         ->set(
                                 ITableNameResolver::class,
-                                fn($c) => new DefaultTableNameResolver(),
+                                fn($c) => $c->get(MaterializationTableNameResolver::class),
                                 IContainer::SHARED | IContainer::NOOVERWRITE)
 
                         ->set(

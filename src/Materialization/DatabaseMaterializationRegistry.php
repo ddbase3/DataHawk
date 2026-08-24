@@ -209,8 +209,8 @@ class DatabaseMaterializationRegistry implements IMaterializationRegistry, IMate
 	private function cleanupOldRunRows(int $keepRunsPerManifest): array {
 		$keepRunsPerManifest = max(1, $keepRunsPerManifest);
 		$rows = $this->database->multiQuery(
-			'SELECT id, manifest_id, status FROM ' . $this->quoteIdentifier(self::RUN_TABLE) .
-			' ORDER BY manifest_id ASC, started_at DESC, id DESC'
+			'SELECT id, manifest_id, schema_name, status FROM ' . $this->quoteIdentifier(self::RUN_TABLE) .
+			' ORDER BY schema_name ASC, manifest_id ASC, started_at DESC, id DESC'
 		);
 
 		$seenByManifest = [];
@@ -232,8 +232,11 @@ class DatabaseMaterializationRegistry implements IMaterializationRegistry, IMate
 				$manifestId = '__unknown__';
 			}
 
-			$seenByManifest[$manifestId] = ($seenByManifest[$manifestId] ?? 0) + 1;
-			if ($seenByManifest[$manifestId] > $keepRunsPerManifest) {
+			$schema = (string)($row['schema_name'] ?? '');
+			$scopeManifestId = $schema . ':' . $manifestId;
+
+			$seenByManifest[$scopeManifestId] = ($seenByManifest[$scopeManifestId] ?? 0) + 1;
+			if ($seenByManifest[$scopeManifestId] > $keepRunsPerManifest) {
 				$deleteIds[] = $id;
 			}
 		}
@@ -367,6 +370,7 @@ class DatabaseMaterializationRegistry implements IMaterializationRegistry, IMate
 		$row = $this->database->singleQuery(
 			'SELECT id FROM ' . $this->quoteIdentifier(self::RUN_TABLE) .
 			' WHERE manifest_id = ' . $this->quoteLiteral($manifest->id) .
+			' AND schema_name = ' . $this->quoteLiteral($manifest->targetSchema) .
 			' AND physical_table = ' . $this->quoteLiteral($physicalTable) .
 			' AND generation = ' . $this->quoteLiteral($generation) .
 			' ORDER BY id DESC LIMIT 1'

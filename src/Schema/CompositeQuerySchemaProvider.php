@@ -20,9 +20,10 @@ namespace DataHawk\Schema;
 
 use Base3\Api\IServiceRegistry;
 use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Api\IScopedQuerySchemaProvider;
 use ResourceFoundation\Dto\TableMetadata;
 
-class CompositeQuerySchemaProvider implements IQuerySchemaProvider {
+class CompositeQuerySchemaProvider implements IScopedQuerySchemaProvider {
 
 	public function __construct(
 		private readonly IServiceRegistry $registry
@@ -34,47 +35,91 @@ class CompositeQuerySchemaProvider implements IQuerySchemaProvider {
 	public function getSchema(): array {
 		$schema = [];
 
-		foreach ($this->registry->listNames() as $name) {
-			$schema = array_merge($schema, $this->registry->get($name)->getSchema());
+		foreach($this->getScopes() as $scope) {
+			$schema = array_merge($schema, $this->getSchemaForScope($scope));
 		}
 
 		return $schema;
 	}
 
 	public function getTable(string $tableName): ?TableMetadata {
-		[$providerName, $localTableName] = $this->splitQualifiedTableName($tableName);
-		if ($providerName !== null) {
-			if (!$this->registry->has($providerName)) {
-				return null;
-			}
-
-			return $this->registry->get($providerName)->getTable($localTableName);
+		[$scope, $localTableName] = $this->splitQualifiedTableName($tableName);
+		if($scope !== null) {
+			return $this->getTableForScope($scope, $localTableName);
 		}
 
 		$defaultTable = $this->registry->getDefault()->getTable($tableName);
-		if ($defaultTable !== null) {
+		if($defaultTable !== null) {
 			return $defaultTable;
 		}
 
-		foreach ($this->registry->listNames() as $name) {
-			$table = $this->registry->get($name)->getTable($tableName);
-			if ($table !== null) {
-				return $table;
+		$matches = [];
+		foreach($this->getScopes() as $scopeName) {
+			$table = $this->getTableForScope($scopeName, $tableName);
+			if($table !== null) {
+				$matches[$scopeName] = $table;
 			}
 		}
 
-		return null;
+		if(count($matches) > 1) {
+			throw new \RuntimeException(
+				'Query table identifier is ambiguous: ' . $tableName . ' (' . implode(', ', array_keys($matches)) . ')'
+			);
+		}
+
+		return $matches === [] ? null : reset($matches);
 	}
 
+	public function getScopes(): array {
+		$scopes = $this->registry->listNames();
+		sort($scopes);
+		return array_values($scopes);
+	}
+
+	public function getDefaultScope(): string {
+		foreach($this->getScopes() as $scope) {
+			if($this->registry->get($scope) === $this->registry->getDefault()) {
+				return $scope;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * @return TableMetadata[]
+	 */
+	public function getSchemaForScope(string $scope): array {
+		$scope = trim($scope);
+		if($scope === '' || !$this->registry->has($scope)) {
+			return [];
+		}
+
+		return $this->registry->get($scope)->getSchema();
+	}
+
+	public function getTableForScope(string $scope, string $tableName): ?TableMetadata {
+		$scope = trim($scope);
+		$tableName = trim($tableName);
+		if($scope === '' || $tableName === '' || !$this->registry->has($scope)) {
+			return null;
+		}
+
+		return $this->registry->get($scope)->getTable($tableName);
+	}
+
+	/**
+	 * @return array{0:?string,1:string}
+	 */
 	private function splitQualifiedTableName(string $tableName): array {
-		foreach ([':', '.'] as $separator) {
-			if (!str_contains($tableName, $separator)) {
+		foreach([':', '.'] as $separator) {
+			if(!str_contains($tableName, $separator)) {
 				continue;
 			}
 
-			[$providerName, $localTableName] = explode($separator, $tableName, 2);
-			if ($providerName !== '' && $localTableName !== '') {
-				return [$providerName, $localTableName];
+			[$scope, $localTableName] = explode($separator, $tableName, 2);
+			if($scope !== '' && $localTableName !== '') {
+				return [$scope, $localTableName];
 			}
 		}
 

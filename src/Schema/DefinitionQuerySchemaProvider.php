@@ -16,20 +16,19 @@
 
 namespace DataHawk\Schema;
 
-use Base3\Settings\Api\ISettingsStore;
+use ResourceFoundation\Api\IQuerySchemaDefinitionProvider;
 use ResourceFoundation\Api\IQuerySchemaProvider;
 use ResourceFoundation\Dto\FieldMetadata;
 use ResourceFoundation\Dto\JoinMetadata;
 use ResourceFoundation\Dto\TableMetadata;
 
-final class SettingsQuerySchemaProvider implements IQuerySchemaProvider {
+final class DefinitionQuerySchemaProvider implements IQuerySchemaProvider {
 
 	/** @var TableMetadata[]|null */
 	private ?array $schema = null;
 
 	public function __construct(
-		private readonly ISettingsStore $settingsStore,
-		private readonly string $group
+		private readonly IQuerySchemaDefinitionProvider $definitionProvider
 	) {}
 
 	public function getSchema(): array {
@@ -38,7 +37,7 @@ final class SettingsQuerySchemaProvider implements IQuerySchemaProvider {
 		}
 
 		$tables = [];
-		$settings = $this->settingsStore->getGroup($this->group);
+		$settings = $this->definitionProvider->getDefinitions();
 		ksort($settings);
 
 		foreach($settings as $name => $dataset) {
@@ -48,7 +47,7 @@ final class SettingsQuerySchemaProvider implements IQuerySchemaProvider {
 
 			$definition = $dataset['definition'] ?? null;
 			if(!is_array($definition)) {
-				throw new \RuntimeException('Reporting source setting must contain a definition array: ' . (string)$name);
+				throw new \RuntimeException('Query-schema definition dataset must contain a definition array: ' . (string)$name);
 			}
 
 			$tables[] = $this->deserializeTable($definition, (string)$name);
@@ -69,7 +68,7 @@ final class SettingsQuerySchemaProvider implements IQuerySchemaProvider {
 
 	private function deserializeTable(array $data, string $name): TableMetadata {
 		if(empty($data['name']) || !is_string($data['name'])) {
-			throw new \RuntimeException('Reporting source setting must define a non-empty table name: ' . $name);
+			throw new \RuntimeException('Query-schema definition must define a non-empty table name: ' . $name);
 		}
 
 		return new TableMetadata(

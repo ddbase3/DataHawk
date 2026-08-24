@@ -57,6 +57,11 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 		flex-wrap: wrap;
 	}
 
+	.datahawk-materialization-scope {
+		min-width: 220px;
+		padding: 6px 8px;
+	}
+
 	.datahawk-materialization-cards {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -266,10 +271,12 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 <div class="datahawk-materialization-shell">
 	<h1><?php echo htmlspecialchars($title, ENT_QUOTES); ?></h1>
 	<p>
-		<?php echo htmlspecialchars($t('intro', 'DataHawk materialization status based on JSON manifests, the registry, recent runs and generated physical tables.'), ENT_QUOTES); ?>
+		<?php echo htmlspecialchars($t('intro', 'DataHawk materialization status based on configured manifests, the registry, recent runs and generated physical tables.'), ENT_QUOTES); ?>
 	</p>
 
 	<div class="datahawk-materialization-toolbar">
+		<label for="datahawk-materialization-scope"><?php echo htmlspecialchars($t('scope', 'Scope'), ENT_QUOTES); ?></label>
+		<select id="datahawk-materialization-scope" class="datahawk-materialization-scope"></select>
 		<button type="button" class="datahawk-materialization-button" id="datahawk-materialization-reload"><?php echo htmlspecialchars($t('reload', 'Reload'), ENT_QUOTES); ?></button>
 		<button type="button" class="datahawk-materialization-button datahawk-materialization-button-primary" id="datahawk-materialization-refresh-due"><?php echo htmlspecialchars($t('refresh_due', 'Refresh due'), ENT_QUOTES); ?></button>
 		<button type="button" class="datahawk-materialization-button" id="datahawk-materialization-refresh-all"><?php echo htmlspecialchars($t('refresh_all', 'Refresh all'), ENT_QUOTES); ?></button>
@@ -295,9 +302,11 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 		const contentElement = document.getElementById('datahawk-materialization-content');
 		const cardsElement = document.getElementById('datahawk-materialization-cards');
 		const outputElement = document.getElementById('datahawk-materialization-output');
+		const scopeElement = document.getElementById('datahawk-materialization-scope');
 		const gridInstances = new Map();
 
 		let currentPage = null;
+		let activeScope = '';
 		let modularGridModulePromise = null;
 
 		function getText(value, placeholder = '-') {
@@ -381,10 +390,10 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 			return row.is_due ? createPill(tr('status_due', 'due'), 'due') : createPill(tr('status_ok', 'ok'), 'success');
 		}
 
-		function actionButton(manifestId) {
+		function actionButton(row) {
 			const button = createButton(tr('refresh', 'Refresh'), 'datahawk-materialization-button-small');
 			button.addEventListener('click', () => {
-				refreshManifest(manifestId).catch((error) => setOutput(tr('refresh_failed', 'Refresh failed:') + ' ' + getText(error && error.message, String(error))));
+				refreshManifest(getText(row.scope, ''), getText(row.id, '')).catch((error) => setOutput(tr('refresh_failed', 'Refresh failed:') + ' ' + getText(error && error.message, String(error))));
 			});
 
 			return button;
@@ -417,21 +426,23 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				setOutput(message);
 			}
 
-			const response = await postJson({mode: 'page'});
+			const response = await postJson({mode: 'page', scope: activeScope});
 
 			if(!response || response.ok !== true) {
 				throw new Error(getText(response && response.error, tr('load_failed_data', 'Failed to load materialization data.')));
 			}
 
 			currentPage = response;
+			activeScope = getText(response.scope, '');
+			renderScopeSelector(response.scopes || [], activeScope);
 			renderPage(response);
 			await initGrids(response);
 			setOutput(tr('loaded_at', 'Loaded materialization data at %s').replace('%s', getText(new Date().toLocaleString())));
 		}
 
-		async function refreshManifest(manifestId) {
+		async function refreshManifest(scope, manifestId) {
 			setOutput(tr('refreshing_manifest', 'Refreshing %s ...').replace('%s', manifestId));
-			const response = await postJson({mode: 'refresh_manifest', manifestId, buildMode: 'refresh'});
+			const response = await postJson({mode: 'refresh_manifest', scope, manifestId, buildMode: 'refresh'});
 
 			if(!response) {
 				throw new Error(tr('no_response', 'No response.'));
@@ -441,6 +452,8 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 			if(page) {
 				currentPage = page;
+				activeScope = getText(page.scope, '');
+				renderScopeSelector(page.scopes || [], activeScope);
 				renderPage(page);
 				await initGrids(page);
 			}
@@ -454,7 +467,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 		async function refreshDue(force) {
 			setOutput(force ? tr('refreshing_all', 'Refreshing all materializations ...') : tr('refreshing_due', 'Refreshing due materializations ...'));
-			const response = await postJson({mode: force ? 'refresh_all' : 'refresh_due'});
+			const response = await postJson({mode: force ? 'refresh_all' : 'refresh_due', scope: activeScope});
 
 			if(!response) {
 				throw new Error(tr('no_response', 'No response.'));
@@ -464,6 +477,8 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 			if(page) {
 				currentPage = page;
+				activeScope = getText(page.scope, '');
+				renderScopeSelector(page.scopes || [], activeScope);
 				renderPage(page);
 				await initGrids(page);
 			}
@@ -473,6 +488,29 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 			const ids = response.manifestIds || [];
 			setOutput(tr('refresh_finished', '%s finished: %s').replace('%s', force ? tr('refresh_all', 'Refresh all') : tr('refresh_due', 'Refresh due')).replace('%s', ids.length ? ids.join(', ') : tr('no_materializations_due', 'no materializations due')));
+		}
+
+		function renderScopeSelector(scopes, selectedScope) {
+			if(!scopeElement) {
+				return;
+			}
+
+			const options = [createElement('option', '', tr('all_scopes', 'All scopes'))];
+			options[0].value = '';
+
+			(scopes || []).forEach((scope) => {
+				const value = getText(scope, '');
+				if(value === '') {
+					return;
+				}
+
+				const option = createElement('option', '', value);
+				option.value = value;
+				options.push(option);
+			});
+
+			scopeElement.replaceChildren(...options);
+			scopeElement.value = selectedScope || '';
 		}
 
 		function renderPage(page) {
@@ -551,6 +589,15 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 		function manifestGridDefinition(gridView, detailed = true, title = tr('manifests', 'Manifests'), description = '') {
 			const columns = [
 				{
+					key: 'scope',
+					label: tr('scope', 'Scope'),
+					width: 180,
+					sortType: 'string',
+					render(value) {
+						return code(value);
+					}
+				},
+				{
 					key: 'due_text',
 					label: tr('due', 'Due'),
 					width: 90,
@@ -601,7 +648,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 					width: 110,
 					sortable: false,
 					render(value, row) {
-						return actionButton(row.id);
+						return actionButton(row);
 					}
 				}
 			];
@@ -651,6 +698,15 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				pageSize: 50,
 				columns: [
 					{
+						key: 'scope',
+						label: tr('scope', 'Scope'),
+						width: 180,
+						sortType: 'string',
+						render(value) {
+							return code(value);
+						}
+					},
+					{
 						key: 'is_current',
 						label: tr('current', 'Current'),
 						width: 100,
@@ -665,7 +721,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 						width: 260,
 						sortType: 'string',
 						render(value, row) {
-							return code(getText(row.schema_name, '') + '.' + getText(row.logical_table, ''));
+							return code(value);
 						}
 					},
 					{
@@ -713,6 +769,15 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				searchPlaceholder: tr('search_runs', 'Search runs, messages or manifests'),
 				pageSize: 50,
 				columns: [
+					{
+						key: 'scope',
+						label: tr('scope', 'Scope'),
+						width: 180,
+						sortType: 'string',
+						render(value) {
+							return code(value);
+						}
+					},
 					{
 						key: 'status',
 						label: tr('status', 'Status'),
@@ -779,6 +844,15 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				searchPlaceholder: tr('search_tables', 'Search materialized tables'),
 				pageSize: 50,
 				columns: [
+					{
+						key: 'scope',
+						label: tr('scope', 'Scope'),
+						width: 180,
+						sortType: 'string',
+						render(value) {
+							return code(value);
+						}
+					},
 					{
 						key: 'is_current',
 						label: tr('current', 'Current'),
@@ -873,6 +947,7 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 
 					return {
 						mode: 'grid',
+						scope: activeScope,
 						gridView: definition.gridView,
 						page: request.page || 1,
 						pageSize: request.pageSize || definition.pageSize || 50,
@@ -1024,6 +1099,13 @@ $t = static function(string $key, string $fallback) use ($translations): string 
 				}
 
 				return normalized;
+			});
+		}
+
+		if(scopeElement) {
+			scopeElement.addEventListener('change', () => {
+				activeScope = scopeElement.value || '';
+				loadPage(tr('loading', 'Loading ...')).catch((error) => setOutput(tr('loading_failed', 'Loading failed:') + ' ' + getText(error && error.message, String(error))));
 			});
 		}
 

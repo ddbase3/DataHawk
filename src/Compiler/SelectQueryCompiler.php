@@ -21,6 +21,7 @@ namespace DataHawk\Compiler;
 use DataHawk\Api\IReportQueryTypeCompiler;
 use DataHawk\Util\Graph;
 use ResourceFoundation\Api\IQuerySchemaProvider;
+use ResourceFoundation\Api\IScopedQuerySchemaProvider;
 use ResourceFoundation\Api\ITableNameResolver;
 use ResourceFoundation\Dto\QueryStatement;
 use ResourceFoundation\Dto\TableNameResolutionContext;
@@ -31,7 +32,6 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 	private ElementCompiler $elementCompiler;
 	private AliasResolver $aliasResolver;
 	private JoinPlanner $joinPlanner;
-	private Graph $joinGraph;
 	private IQuerySchemaProvider $schemaProvider;
 
 	public function __construct(
@@ -43,20 +43,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		$this->aliasResolver = new AliasResolver();
 		$this->elementCompiler = new ElementCompiler($this->aliasResolver, $this);
 
-		// Build graph of all join relations between tables
-		$this->joinGraph = new Graph();
-		foreach ($schemaProvider->getSchema() as $table) {
-			$this->joinGraph->addNode($table->name);
-			foreach ($table->joins as $join) {
-				$meta = $join->meta;
-				$meta['on'] = $join->on;
-				$meta['type'] = $join->type;
-				$label = !empty($meta['default']) ? 'default' : uniqid('join_', true);
-				$this->joinGraph->addEdge($table->name, $join->targetTable, $label, $meta);
-			}
-		}
-
-		$this->joinPlanner = new JoinPlanner($this->aliasResolver, $this->elementCompiler, $this->joinGraph, $this->tableNameResolver);
+		$this->joinPlanner = $this->createJoinPlanner('');
 	}
 
 	public function compile(array $query): QueryStatement {
@@ -68,7 +55,9 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		$this->aliasResolver->scan($query);
 
 		$table = $query['table'] ?? $query['from'] ?? $this->aliasResolver->getFirstUsedTable();
-		$schema = (string)($query['schema'] ?? $query['provider'] ?? '');
+		$schema = trim((string)($query['schema'] ?? $query['provider'] ?? ''));
+		$schemaTables = $this->getSchemaForQuery($schema);
+		$this->joinPlanner = $this->createJoinPlanner($schema, $schemaTables);
 		if (!$table) {
 			throw new QueryValidationException("Query must contain 'table' or at least one field reference with 'table'.");
 		}
@@ -87,7 +76,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 
 		// Build table metadata map
 		$tableMetaMap = [];
-		foreach ($this->schemaProvider->getSchema() as $tableMeta) {
+		foreach ($schemaTables as $tableMeta) {
 			$tableMetaMap[$tableMeta->name] = $tableMeta;
 		}
 
@@ -220,6 +209,48 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		return new QueryStatement($sql, [], $compiledFields, $isSensitiveQuery, $hasWildcard);
 	}
 
+	/**
+	 * @return array<int,\ResourceFoundation\Dto\TableMetadata>
+	 */
+	private function getSchemaForQuery(string $scope): array {
+		if(!$this->schemaProvider instanceof IScopedQuerySchemaProvider) {
+			return $this->schemaProvider->getSchema();
+		}
+
+		$scope = trim($scope);
+		if($scope === '') {
+			$scope = $this->schemaProvider->getDefaultScope();
+		}
+
+		if($scope === '') {
+			return [];
+		}
+
+		if(!in_array($scope, $this->schemaProvider->getScopes(), true)) {
+			throw new QueryValidationException('Unknown query schema scope: ' . $scope);
+		}
+
+		return $this->schemaProvider->getSchemaForScope($scope);
+	}
+
+	private function createJoinPlanner(string $scope, ?array $schema = null): JoinPlanner {
+		$joinGraph = new Graph();
+		$schema ??= $this->getSchemaForQuery($scope);
+
+		foreach($schema as $table) {
+			$joinGraph->addNode($table->name);
+			foreach($table->joins as $join) {
+				$meta = $join->meta;
+				$meta['on'] = $join->on;
+				$meta['type'] = $join->type;
+				$label = !empty($meta['default']) ? 'default' : uniqid('join_', true);
+				$joinGraph->addEdge($table->name, $join->targetTable, $label, $meta);
+			}
+		}
+
+		return new JoinPlanner($this->aliasResolver, $this->elementCompiler, $joinGraph, $this->tableNameResolver);
+	}
+
 	private function resolveTableName(string $tableName, ?string $alias, string $operation, string $schema = ''): string {
 		return $this->tableNameResolver?->resolveTableName(
 			$tableName,
@@ -236,14 +267,18 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 		$all = !($union['distinct'] ?? true); // false → UNION ALL
 
 		$sqlParts = [];
+		$schema = trim((string)($query['schema'] ?? $query['provider'] ?? ''));
 		foreach ($union['queries'] as $subQuery) {
+			if($schema !== '' && !isset($subQuery['schema']) && !isset($subQuery['provider'])) {
+				$subQuery['schema'] = $schema;
+			}
 			$compiled = $this->compile($subQuery); // recursive call
 			$sqlParts[] = '(' . $compiled->sql . ')';
 		}
 
 		$sql = implode($all ? ' UNION ALL ' : ' UNION ', $sqlParts);
 
-		// ORDER BY for unions – also guard against empty/invalid parts
+		// ORDER BY for unions, also guard against empty/invalid parts
 		if (!empty($query['order_by']) && is_array($query['order_by'])) {
 			$orderParts = [];
 			foreach ($query['order_by'] as $order) {

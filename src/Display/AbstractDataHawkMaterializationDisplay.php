@@ -30,6 +30,7 @@ use DataHawk\Materialization\MaterializationRefreshPlanner;
 use ResourceFoundation\Api\IMaterializationManifestProvider;
 use ResourceFoundation\Api\IMaterializationRegistry;
 use ResourceFoundation\Api\IMaterializationService;
+use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
 use ResourceFoundation\Dto\MaterializationManifest;
 use ResourceFoundation\Dto\MaterializationRunResult;
 use Throwable;
@@ -141,15 +142,17 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 			return $this->buildRefreshManifestResponse($payload);
 		}
 
+		$scope = $this->readString($payload, 'scope');
+
 		if ($mode === 'refresh_due') {
-			return $this->buildRefreshDueResponse(false);
+			return $this->buildRefreshDueResponse(false, $scope);
 		}
 
 		if ($mode === 'refresh_all') {
-			return $this->buildRefreshDueResponse(true);
+			return $this->buildRefreshDueResponse(true, $scope);
 		}
 
-		return $this->buildPageResponse();
+		return $this->buildPageResponse($scope);
 	}
 
 	/**
@@ -158,7 +161,8 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	 */
 	private function buildGridResponse(array $payload): array {
 		$gridView = $this->readString($payload, 'gridView', $this->getViewName());
-		$rows = $this->loadGridRows($gridView);
+		$scope = $this->readString($payload, 'scope');
+		$rows = $this->loadGridRows($gridView, $scope);
 		$search = $this->readString($payload, 'search');
 		$filters = $this->normalizeGridFilters($payload['filters'] ?? null);
 		$sort = $this->normalizeGridSort($payload['sort'] ?? null, $payload);
@@ -194,31 +198,38 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadGridRows(string $gridView): array {
+	private function loadGridRows(string $gridView, string $scope = ''): array {
 		return match ($gridView) {
-			'overview_due' => array_values(array_filter($this->loadManifestRows(), fn(array $row) => (bool)($row['is_due'] ?? false))),
-			'overview_manifests', 'manifests' => $this->loadManifestRows(),
-			'overview_runs', 'runs' => $this->loadRunRows(),
-			'registry' => $this->loadRegistryRows(),
-			'tables' => $this->loadTableRows(),
-			default => $this->loadManifestRows(),
+			'overview_due' => array_values(array_filter($this->loadManifestRows($scope), fn(array $row) => (bool)($row['is_due'] ?? false))),
+			'overview_manifests', 'manifests' => $this->loadManifestRows($scope),
+			'overview_runs', 'runs' => $this->loadRunRows($scope),
+			'registry' => $this->loadRegistryRows($scope),
+			'tables' => $this->loadTableRows($scope),
+			default => $this->loadManifestRows($scope),
 		};
 	}
 
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function buildPageResponse(): array {
+	private function buildPageResponse(string $scope = ''): array {
+		$scopes = $this->loadScopes();
+		if($scope !== '' && !in_array($scope, $scopes, true)) {
+			$scope = '';
+		}
+
 		return [
 			'ok' => true,
 			'mode' => 'page',
 			'view' => $this->getViewName(),
 			'generated_at' => time(),
-			'overview' => $this->buildOverview(),
-			'manifests' => $this->loadManifestRows(),
-			'registry' => $this->loadRegistryRows(),
-			'runs' => $this->loadRunRows(),
-			'tables' => $this->loadTableRows(),
+			'scope' => $scope,
+			'scopes' => $scopes,
+			'overview' => $this->buildOverview($scope),
+			'manifests' => $this->loadManifestRows($scope),
+			'registry' => $this->loadRegistryRows($scope),
+			'runs' => $this->loadRunRows($scope),
+			'tables' => $this->loadTableRows($scope),
 		];
 	}
 
@@ -228,6 +239,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	 */
 	private function buildRefreshManifestResponse(array $payload): array {
 		$manifestId = $this->readString($payload, 'manifestId');
+		$scope = $this->readString($payload, 'scope');
 		$mode = $this->normalizeBuildMode($this->readString($payload, 'buildMode', 'refresh'));
 
 		if ($manifestId === '') {
@@ -239,7 +251,9 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 			return $this->buildErrorResponse($this->t('error_manifest_provider_not_wired', 'Materialization manifest provider is not wired.'), 'refresh_manifest');
 		}
 
-		$manifest = $manifestProvider->getManifest($manifestId);
+		$manifest = $scope !== '' && $manifestProvider instanceof IScopedMaterializationManifestProvider
+			? $manifestProvider->getManifestForScope($scope, $manifestId)
+			: $manifestProvider->getManifest($manifestId);
 		if ($manifest === null) {
 			return $this->buildErrorResponse($this->t('error_unknown_manifest', 'Unknown materialization manifest: %s', $manifestId), 'refresh_manifest');
 		}
@@ -249,7 +263,8 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 			return $this->buildErrorResponse($this->t('error_service_not_wired', 'Materialization service is not wired.'), 'refresh_manifest');
 		}
 
-		$result = $this->refreshManifest($service, $manifestId, $mode);
+		$serviceManifestId = $scope !== '' ? $scope . ':' . $manifestId : $manifestId;
+		$result = $this->refreshManifest($service, $serviceManifestId, $mode);
 		$this->markManualResult($manifest, $result);
 
 		return [
@@ -257,14 +272,14 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 			'mode' => 'refresh_manifest',
 			'buildMode' => $mode,
 			'result' => $this->formatRunResult($result),
-			'page' => $this->buildPageResponse(),
+			'page' => $this->buildPageResponse($scope),
 		];
 	}
 
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function buildRefreshDueResponse(bool $force): array {
+	private function buildRefreshDueResponse(bool $force, string $scope = ''): array {
 		$manifestProvider = $this->getManifestProvider();
 		if ($manifestProvider === null) {
 			return $this->buildErrorResponse($this->t('error_manifest_provider_not_wired', 'Materialization manifest provider is not wired.'), $force ? 'refresh_all' : 'refresh_due');
@@ -286,7 +301,33 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		}
 
 		$planner = new MaterializationRefreshPlanner($manifestProvider, $registry, $stateStore);
-		$manifestIds = $planner->getManifestIdsToRefresh([], $force);
+		$configuredManifestIds = [];
+		if($scope !== '') {
+			if(!$manifestProvider instanceof IScopedMaterializationManifestProvider) {
+				return $this->buildErrorResponse($this->t('error_scope_not_supported', 'Materialization scopes are not supported.'), $force ? 'refresh_all' : 'refresh_due');
+			}
+
+			if(!in_array($scope, $manifestProvider->getScopes(), true)) {
+				return $this->buildErrorResponse($this->t('error_unknown_scope', 'Unknown materialization scope: %s', $scope), $force ? 'refresh_all' : 'refresh_due');
+			}
+
+			$configuredManifestIds = array_map(
+				fn(MaterializationManifest $manifest) => $scope . ':' . $manifest->id,
+				$manifestProvider->getManifestsForScope($scope)
+			);
+
+			if($configuredManifestIds === []) {
+				return [
+					'ok' => true,
+					'mode' => $force ? 'refresh_all' : 'refresh_due',
+					'force' => $force,
+					'manifestIds' => [],
+					'results' => [],
+					'page' => $this->buildPageResponse($scope),
+				];
+			}
+		}
+		$manifestIds = $planner->getManifestIdsToRefresh($configuredManifestIds, $force);
 		$results = [];
 
 		foreach ($manifestIds as $manifestId) {
@@ -316,18 +357,18 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 			'force' => $force,
 			'manifestIds' => $manifestIds,
 			'results' => array_map(fn(MaterializationRunResult $result) => $this->formatRunResult($result), $results),
-			'page' => $this->buildPageResponse(),
+			'page' => $this->buildPageResponse($scope),
 		];
 	}
 
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function buildOverview(): array {
-		$manifests = $this->loadManifestRows();
-		$registry = $this->loadRegistryRows();
-		$runs = $this->loadRunRows();
-		$tables = $this->loadTableRows();
+	private function buildOverview(string $scope = ''): array {
+		$manifests = $this->loadManifestRows($scope);
+		$registry = $this->loadRegistryRows($scope);
+		$runs = $this->loadRunRows($scope);
+		$tables = $this->loadTableRows($scope);
 
 		$currentRegistry = array_values(array_filter($registry, fn(array $row) => (int)($row['is_current'] ?? 0) === 1));
 		$failedRuns = array_values(array_filter($runs, fn(array $row) => (string)($row['status'] ?? '') === 'failed'));
@@ -349,19 +390,24 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadManifestRows(): array {
+	private function loadManifestRows(string $scope = ''): array {
 		$provider = $this->getManifestProvider();
 		if ($provider === null) {
 			return [];
 		}
 
+		$manifests = $scope !== '' && $provider instanceof IScopedMaterializationManifestProvider
+			? $provider->getManifestsForScope($scope)
+			: $provider->getManifests();
+
 		$rows = [];
-		foreach ($provider->getManifests() as $manifest) {
+		foreach ($manifests as $manifest) {
 			$current = $this->getCurrentGeneration($manifest);
 			$state = $this->getManifestState($manifest);
 
 			$rows[] = [
 				'id' => $manifest->id,
+				'scope' => $manifest->targetSchema,
 				'enabled' => $manifest->enabled,
 				'priority' => $manifest->priority,
 				'source_schema' => $manifest->sourceSchema,
@@ -398,14 +444,15 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadRegistryRows(): array {
+	private function loadRegistryRows(string $scope = ''): array {
 		if (!$this->tableExists('base3_mat_registry')) {
 			return [];
 		}
 
+		$where = $scope !== '' ? " WHERE schema_name = '" . $this->database->escape($scope) . "'" : '';
 		$rows = $this->database->multiQuery(
 			'SELECT id, schema_name, logical_table, physical_table, generation, row_count, status, is_current, published_at, created_at, meta_json ' .
-			'FROM `base3_mat_registry` ORDER BY logical_table ASC, is_current DESC, published_at DESC, id DESC'
+			'FROM `base3_mat_registry`' . $where . ' ORDER BY logical_table ASC, is_current DESC, published_at DESC, id DESC'
 		);
 
 		return array_map(fn(array $row) => $this->normalizeRegistryRow($row), $rows);
@@ -414,14 +461,15 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadRunRows(): array {
+	private function loadRunRows(string $scope = ''): array {
 		if (!$this->tableExists('base3_mat_run')) {
 			return [];
 		}
 
+		$where = $scope !== '' ? " WHERE schema_name = '" . $this->database->escape($scope) . "'" : '';
 		$rows = $this->database->multiQuery(
 			'SELECT id, manifest_id, schema_name, logical_table, physical_table, generation, mode, status, message, row_count, started_at, finished_at, meta_json ' .
-			'FROM `base3_mat_run` ORDER BY id DESC'
+			'FROM `base3_mat_run`' . $where . ' ORDER BY id DESC'
 		);
 
 		return array_map(fn(array $row) => $this->normalizeRunRow($row), $rows);
@@ -430,14 +478,14 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function loadTableRows(): array {
+	private function loadTableRows(string $scope = ''): array {
 		$this->database->connect();
 		if (!$this->database->connected()) {
 			return [];
 		}
 
 		$rows = $this->database->multiQuery("SHOW TABLES LIKE 'base3\\_mat\\_%'");
-		$registry = $this->loadRegistryRows();
+		$registry = $this->loadRegistryRows($scope);
 		$currentByPhysical = [];
 		$registeredByPhysical = [];
 
@@ -466,9 +514,13 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 			$registryRow = $registeredByPhysical[$tableName] ?? null;
 			$currentRow = $currentByPhysical[$tableName] ?? null;
+			if($scope !== '' && $registryRow === null) {
+				continue;
+			}
 
 			$result[] = [
 				'table_name' => $tableName,
+				'scope' => (string)($registryRow['schema_name'] ?? ''),
 				'logical_table' => (string)($registryRow['logical_table'] ?? ''),
 				'schema_name' => (string)($registryRow['schema_name'] ?? ''),
 				'generation' => (string)($registryRow['generation'] ?? ''),
@@ -652,17 +704,17 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		}
 
 		$now = time();
-		$stateStore->set($this->stateKey($manifest->id, 'last_attempt_at'), $now);
-		$stateStore->set($this->stateKey($manifest->id, 'last_status'), $result->success ? 'success' : 'failed');
-		$stateStore->set($this->stateKey($manifest->id, 'last_message'), $result->message);
+		$stateStore->set($this->stateKey($manifest, 'last_attempt_at'), $now);
+		$stateStore->set($this->stateKey($manifest, 'last_status'), $result->success ? 'success' : 'failed');
+		$stateStore->set($this->stateKey($manifest, 'last_message'), $result->message);
 
 		if ($result->rowCount !== null) {
-			$stateStore->set($this->stateKey($manifest->id, 'last_row_count'), $result->rowCount);
+			$stateStore->set($this->stateKey($manifest, 'last_row_count'), $result->rowCount);
 		}
 
 		if ($result->success) {
-			$stateStore->set($this->stateKey($manifest->id, 'last_success_at'), $now);
-			$stateStore->set($this->stateKey($manifest->id, 'last_success_date'), date('Y-m-d', $now));
+			$stateStore->set($this->stateKey($manifest, 'last_success_at'), $now);
+			$stateStore->set($this->stateKey($manifest, 'last_success_date'), date('Y-m-d', $now));
 		}
 
 		$stateStore->flush();
@@ -693,10 +745,10 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		}
 
 		return [
-			'last_success_at' => (int)$stateStore->get($this->stateKey($manifest->id, 'last_success_at'), 0),
-			'last_status' => (string)$stateStore->get($this->stateKey($manifest->id, 'last_status'), ''),
-			'last_message' => (string)$stateStore->get($this->stateKey($manifest->id, 'last_message'), ''),
-			'last_row_count' => $stateStore->get($this->stateKey($manifest->id, 'last_row_count'), null),
+			'last_success_at' => (int)$stateStore->get($this->stateKey($manifest, 'last_success_at'), 0),
+			'last_status' => (string)$stateStore->get($this->stateKey($manifest, 'last_status'), ''),
+			'last_message' => (string)$stateStore->get($this->stateKey($manifest, 'last_message'), ''),
+			'last_row_count' => $stateStore->get($this->stateKey($manifest, 'last_row_count'), null),
 		];
 	}
 
@@ -729,7 +781,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 		$seconds = (int)($schedule['seconds'] ?? 300);
 		$seconds = $seconds > 0 ? $seconds : 300;
-		$lastSuccess = (int)$stateStore->get($this->stateKey($manifest->id, 'last_success_at'), 0);
+		$lastSuccess = (int)$stateStore->get($this->stateKey($manifest, 'last_success_at'), 0);
 
 		return $lastSuccess <= 0 || (time() - $lastSuccess) >= $seconds;
 	}
@@ -746,7 +798,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		}
 
 		$today = date('Y-m-d');
-		$lastSuccessDate = (string)$stateStore->get($this->stateKey($manifest->id, 'last_success_date'), '');
+		$lastSuccessDate = (string)$stateStore->get($this->stateKey($manifest, 'last_success_date'), '');
 
 		return $lastSuccessDate !== $today && date('H:i') >= $time;
 	}
@@ -806,6 +858,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	private function normalizeRegistryRow(array $row): array {
 		return [
 			'id' => (int)($row['id'] ?? 0),
+			'scope' => (string)($row['schema_name'] ?? ''),
 			'schema_name' => (string)($row['schema_name'] ?? ''),
 			'logical_table' => (string)($row['logical_table'] ?? ''),
 			'physical_table' => (string)($row['physical_table'] ?? ''),
@@ -830,6 +883,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 		return [
 			'id' => (int)($row['id'] ?? 0),
+			'scope' => (string)($row['schema_name'] ?? ''),
 			'manifest_id' => (string)($row['manifest_id'] ?? ''),
 			'schema_name' => (string)($row['schema_name'] ?? ''),
 			'logical_table' => (string)($row['logical_table'] ?? ''),
@@ -878,6 +932,36 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		}
 
 		return '';
+	}
+
+
+	/**
+	 * @return string[]
+	 */
+	private function loadScopes(): array {
+		$scopes = [];
+		$provider = $this->getManifestProvider();
+		if($provider instanceof IScopedMaterializationManifestProvider) {
+			$scopes = $provider->getScopes();
+		}
+
+		foreach($this->loadRegistryRows() as $row) {
+			$scope = trim((string)($row['scope'] ?? ''));
+			if($scope !== '') {
+				$scopes[] = $scope;
+			}
+		}
+
+		foreach($this->loadRunRows() as $row) {
+			$scope = trim((string)($row['scope'] ?? ''));
+			if($scope !== '') {
+				$scopes[] = $scope;
+			}
+		}
+
+		$scopes = array_values(array_unique($scopes));
+		sort($scopes);
+		return $scopes;
 	}
 
 	private function getManifestProvider(): ?IMaterializationManifestProvider {
@@ -991,8 +1075,10 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		return $values === [] ? $text : vsprintf($text, $values);
 	}
 
-	private function stateKey(string $manifestId, string $suffix): string {
-		$manifestId = preg_replace('/[^a-zA-Z0-9_.-]+/', '_', $manifestId) ?? $manifestId;
+	private function stateKey(MaterializationManifest $manifest, string $suffix): string {
+		$scope = trim($manifest->targetSchema) !== '' ? trim($manifest->targetSchema) : 'default';
+		$manifestId = $scope . ':' . $manifest->id;
+		$manifestId = preg_replace('/[^a-zA-Z0-9_.:-]+/', '_', $manifestId) ?? $manifestId;
 		return self::STATE_PREFIX . $manifestId . '.' . $suffix;
 	}
 }

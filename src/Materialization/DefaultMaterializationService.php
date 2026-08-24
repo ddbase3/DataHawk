@@ -85,7 +85,7 @@ class DefaultMaterializationService implements IMaterializationService {
 			$this->finishRun($runId, true, 'Materialization full build completed.', $rowCount, $meta);
 
 			return new MaterializationRunResult(
-				manifestId: $manifest->id,
+				manifestId: $manifestId,
 				success: true,
 				message: 'Materialization full build completed.',
 				generation: $publishedGeneration,
@@ -103,7 +103,7 @@ class DefaultMaterializationService implements IMaterializationService {
 			$this->finishRun($runId, false, $e->getMessage(), null, $meta);
 
 			return new MaterializationRunResult(
-				manifestId: $manifest->id,
+				manifestId: $manifestId,
 				success: false,
 				message: $e->getMessage(),
 				generation: null,
@@ -117,7 +117,7 @@ class DefaultMaterializationService implements IMaterializationService {
 		$manifest = $this->getRequiredManifest($manifestId);
 
 		return new MaterializationRunResult(
-			manifestId: $manifest->id,
+			manifestId: $manifestId,
 			success: false,
 			message: 'Incremental materialization is not implemented yet.',
 			generation: null,
@@ -515,15 +515,7 @@ class DefaultMaterializationService implements IMaterializationService {
 	}
 
 	private function getPhysicalPrefix(MaterializationManifest $manifest): string {
-		$prefix = $manifest->physicalPrefix !== ''
-			? $manifest->physicalPrefix
-			: 'base3_mat_' . $manifest->logicalTable;
-
-		if (!str_starts_with($prefix, 'base3_mat_')) {
-			throw new MaterializationException('Materialization cleanup is limited to base3_mat_* tables.');
-		}
-
-		return $prefix;
+		return $this->physicalTableNameGenerator->getPhysicalPrefix($manifest);
 	}
 
 	private function assertSafePhysicalTable(string $table): void {

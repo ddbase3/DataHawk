@@ -8,7 +8,7 @@ Reports can then read from compact, indexed, report-ready tables instead of repe
 A materialization is defined by a JSON manifest:
 
 1. The manifest defines a logical target table, columns, indexes, and a source query.
-2. DataHawk builds a new physical generation table named `base3_mat_<logical_table>_<generation>`.
+2. DataHawk builds a new physical generation table named `base3_mat_<scope>_<logical_table>_<generation>`.
 3. DataHawk fills the generation table with `INSERT ... SELECT`.
 4. DataHawk publishes the new generation in `base3_mat_registry`.
 5. Query compilation resolves the logical table name to the current physical table through `ITableNameResolver`.
@@ -43,14 +43,16 @@ ilias_materialized.course_report_rows
 	-> base3_mat_course_report_rows_20260701150140_5ff2
 ```
 
-## Project responsibilities
+## Multi-scope composition
 
-DataHawk provides the generic materialization engine, registry, resolver, job, and displays.
-Project plugins provide project-specific source schemas, materialization manifests, and Vizion report configs.
+DataHawk owns the generic materialization engine, registry, resolver, job, displays, and central scope aggregation.
+Feature plugins contribute declarative definitions through ResourceFoundation contracts instead of replacing DataHawk services.
 
-For example, `Base3IliasLab` provides:
+Relevant contribution contracts are:
 
-- `local/DataHawk/source/*.json`
-- `local/DataHawk/materialized/*.json`
-- `local/Vizion/*.json`
-- project wiring for schema providers and table resolver
+- `IQuerySchemaDefinitionProvider` for one source-schema scope
+- `IMaterializationDefinitionProvider` for one materialization target scope
+
+The central DataHawk provider exposes the combined runtime through `IScopedQuerySchemaProvider` and `IScopedMaterializationManifestProvider`. Scope is part of table and manifest identity. A qualified identity uses `scope:table` or `scope:manifest`.
+
+A feature plugin may load its definitions from `ISettingsStore`, files, or another backend. DataHawk consumes only the ResourceFoundation provider contract and does not own that storage choice.

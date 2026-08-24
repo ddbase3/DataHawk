@@ -29,9 +29,12 @@ The **DataHawk** plugin extends the BASE3 framework with a schema-driven query e
 
 ### Schema management
 
-* Schema is provided by an `IQuerySchemaProvider` (default: JSON-based provider)
-* `FileQuerySchemaProvider` loads schema JSON from an explicit directory and is reusable for project/plugin-owned schema areas
-* Table metadata includes joins, tags, categories, domains, default filters
+* Runtime schema access is provided centrally by `IQuerySchemaProvider`.
+* DataHawk aggregates independent schema scopes contributed through ResourceFoundation `IQuerySchemaDefinitionProvider` implementations.
+* Materialization definition scopes contributed through `IMaterializationDefinitionProvider` participate in the same query-schema namespace.
+* `IScopedQuerySchemaProvider` exposes scope enumeration and scope-specific schema access for administration and diagnostics.
+* `FileQuerySchemaProvider` remains available for direct file-backed use, but project plugins no longer need to compose the central provider manually.
+* Table metadata includes joins, tags, categories, domains, default filters.
 
 ### Query execution
 
@@ -43,8 +46,8 @@ The **DataHawk** plugin extends the BASE3 framework with a schema-driven query e
 
 `QueryResult` now also provides write metadata:
 
-* `affectedRows` — affected rows for INSERT/UPDATE/DELETE (if known)
-* `insertId` — last insert id for `type: "insert"` (backend-dependent)
+* `affectedRows`: affected rows for INSERT/UPDATE/DELETE (if known)
+* `insertId`: last insert id for `type: "insert"` (backend-dependent)
 
 ### Transactions
 
