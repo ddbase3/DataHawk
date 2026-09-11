@@ -317,6 +317,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 	 */
 	private function flattenElements(mixed $element): array {
 		if (!is_array($element)) return [];
+		if (($element['type'] ?? null) === 'subquery') return [$element];
 		$result = [$element];
 		foreach ($element as $v) {
 			if (is_array($v)) {
