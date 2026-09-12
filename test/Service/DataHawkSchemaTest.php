@@ -5,7 +5,6 @@ namespace DataHawk\Test\Service;
 use PHPUnit\Framework\TestCase;
 use DataHawk\Service\DataHawkSchema;
 use Base3\Api\IRequest;
-use DataHawk\Api\IReportExporterFactory;
 use ResourceFoundation\Api\IQueryService;
 
 class DataHawkSchemaTest extends TestCase {
@@ -13,9 +12,8 @@ class DataHawkSchemaTest extends TestCase {
 	public function testGetNameReturnsExpectedValue(): void {
 		$req = $this->createStub(IRequest::class);
 		$svc = $this->createStub(IQueryService::class);
-		$factory = $this->createStub(IReportExporterFactory::class);
 
-		new DataHawkSchema($req, $svc, $factory);
+		new DataHawkSchema($req, $svc);
 
 		$this->assertSame('datahawkschema', DataHawkSchema::getName());
 	}
@@ -23,9 +21,8 @@ class DataHawkSchemaTest extends TestCase {
 	public function testGetHelpReturnsString(): void {
 		$req = $this->createStub(IRequest::class);
 		$svc = $this->createStub(IQueryService::class);
-		$factory = $this->createStub(IReportExporterFactory::class);
 
-		$out = new DataHawkSchema($req, $svc, $factory);
+		$out = new DataHawkSchema($req, $svc);
 
 		$this->assertSame("Help of DataHawkSchema\n", $out->getHelp());
 	}
@@ -44,9 +41,8 @@ class DataHawkSchemaTest extends TestCase {
 			->method('listTables')
 			->willReturn(['t1', 't2']);
 
-		$factory = $this->createStub(IReportExporterFactory::class);
 
-		$out = new DataHawkSchema($req, $svc, $factory);
+		$out = new DataHawkSchema($req, $svc);
 
 		$json = $out->getOutput('json');
 		$this->assertJson($json);
@@ -67,9 +63,8 @@ class DataHawkSchemaTest extends TestCase {
 			->method('listDomains')
 			->willReturn(['d1', 'd2']);
 
-		$factory = $this->createStub(IReportExporterFactory::class);
 
-		$out = new DataHawkSchema($req, $svc, $factory);
+		$out = new DataHawkSchema($req, $svc);
 
 		$json = $out->getOutput('json');
 		$this->assertSame(["d1","d2"], json_decode($json, true));
@@ -89,9 +84,8 @@ class DataHawkSchemaTest extends TestCase {
 			->method('listCategories')
 			->willReturn(['c1']);
 
-		$factory = $this->createStub(IReportExporterFactory::class);
 
-		$out = new DataHawkSchema($req, $svc, $factory);
+		$out = new DataHawkSchema($req, $svc);
 
 		$json = $out->getOutput('json');
 		$this->assertSame(["c1"], json_decode($json, true));
@@ -111,9 +105,8 @@ class DataHawkSchemaTest extends TestCase {
 			->method('listTags')
 			->willReturn(['x', 'y']);
 
-		$factory = $this->createStub(IReportExporterFactory::class);
 
-		$out = new DataHawkSchema($req, $svc, $factory);
+		$out = new DataHawkSchema($req, $svc);
 
 		$json = $out->getOutput('json');
 		$this->assertSame(["x","y"], json_decode($json, true));

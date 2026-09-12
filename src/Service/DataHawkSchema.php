@@ -20,15 +20,13 @@ namespace DataHawk\Service;
 
 use Base3\Api\IOutput;
 use Base3\Api\IRequest;
-use DataHawk\Api\IReportExporterFactory;
 use ResourceFoundation\Api\IQueryService;
 
 class DataHawkSchema implements IOutput {
 
 	public function __construct(
 		private readonly IRequest $request,
-		private readonly IQueryService $dataqueryservice,
-		private readonly IReportExporterFactory $reportexporterfactory
+		private readonly IQueryService $dataqueryservice
 	) {}
 
 	// Implementation of IOutput

@@ -227,17 +227,11 @@ Notes:
 
 ---
 
-## Exporters
+## Export boundary
 
-| Format     | Class                     | Use Case                                  |
-| ---------- | ------------------------- | ----------------------------------------- |
-| CSV        | `CsvReportExporter`       | Data analysis, Excel import, simple tools |
-| JSON       | `JsonReportExporter`      | APIs, integration, serialization          |
-| HTML       | `HtmlReportExporter`      | Web preview, printing, PDF generation     |
-| HTML-Mail  | `HtmlTableReportExporter` | Email delivery, HTML templates            |
-| Excel-HTML | `ExcelHtmlReportExporter` | Excel download without external libraries |
+DataHawk is the query layer. It compiles and executes structured queries and returns `ResourceFoundation\Dto\QueryResult`. It does not own report exporters.
 
----
+Result transformation is defined by `ResourceFoundation\Api\IReportExporter` and implemented by output/reporting plugins such as Vizion. This keeps DataHawk usable as a standalone query service without a UI plugin. Consumers that need an export execute their query through `IQueryService` and pass the resulting `QueryResult` to a discoverable `IReportExporter`.
 
 ## Roadmap / ideas
 

@@ -5,7 +5,6 @@ namespace DataHawk\Test;
 use PHPUnit\Framework\TestCase;
 use DataHawk\DataHawkPlugin;
 use Base3\Api\IContainer;
-use DataHawk\Api\IReportExporterFactory;
 use ResourceFoundation\Api\IQueryCompiler;
 use ResourceFoundation\Api\IQuerySchemaProvider;
 use ResourceFoundation\Api\IQueryService;
@@ -70,7 +69,6 @@ class DataHawkPluginTest extends TestCase {
 			IQuerySchemaProvider::class,
 			IQueryCompiler::class,
 			IQueryService::class,
-			IReportExporterFactory::class,
 		];
 
 		foreach ($expected as $id) {

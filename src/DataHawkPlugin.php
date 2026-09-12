@@ -23,7 +23,6 @@ use Base3\Api\IClassMap;
 use Base3\Api\IContainer;
 use Base3\Api\IPlugin;
 use Base3\Database\Api\IDatabase;
-use DataHawk\Api\IReportExporterFactory;
 use DataHawk\Compiler\MysqlReportQueryCompiler;
 use DataHawk\Materialization\CompositeMaterializationSchemaProvider;
 use DataHawk\Materialization\DatabaseMaterializationRegistry;
@@ -34,7 +33,6 @@ use DataHawk\Reporting\ReportingScopeRegistry;
 use DataHawk\Schema\CompositeQuerySchemaProvider;
 use DataHawk\Schema\DataHawkQuerySchemaProviderRegistry;
 use DataHawk\Service\DefaultReportQueryService;
-use DataHawk\Service\ReportExporterFactory;
 use ResourceFoundation\Api\IMaterializationManifestProvider;
 use ResourceFoundation\Api\IMaterializationRegistry;
 use ResourceFoundation\Api\IMaterializationRunRepository;
@@ -166,11 +164,6 @@ class DataHawkPlugin implements IPlugin, ICheck {
                                         $c->get(IQuerySchemaProvider::class),
                                         $c->get(IQueryCompiler::class),
                                         $c),
-                                IContainer::SHARED | IContainer::NOOVERWRITE)
-
-                        ->set(
-                                IReportExporterFactory::class,
-                                fn($c) => new ReportExporterFactory($c->get(IClassMap::class)),
                                 IContainer::SHARED | IContainer::NOOVERWRITE);
         }
 
