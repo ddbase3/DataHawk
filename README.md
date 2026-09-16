@@ -246,3 +246,8 @@ Result transformation is defined by `ResourceFoundation\Api\IReportExporter` and
 
 GPL 3.0. See BASE3 license for framework details.
 
+
+## Documentation
+
+- [Frequently Asked Questions](docs/faq.md)
+- [Privacy and data processing](PRIVACY.md)
