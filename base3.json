@@ -1,0 +1,21 @@
+{
+	"manifestVersion": 1,
+	"name": "DataHawk",
+	"namespace": "DataHawk",
+	"version": "4.7.0",
+	"description": "Schema-driven query engine for reporting and data access in BASE3.",
+	"license": "GPL-3.0-or-later",
+	"maintainers": [
+		{
+			"name": "Daniel Dahme",
+			"url": "https://www.base3.de",
+			"email": "info@base3.de"
+		}
+	],
+	"repository": "https://github.com/ddbase3/DataHawk",
+	"dependencies": {
+		"Base3Framework": ">=4.10.0",
+		"ResourceFoundation": ">=4.5.0",
+		"ClientStack": ">=4.23.0"
+	}
+}
