@@ -78,7 +78,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	abstract protected function getViewName(): string;
 
 	private function handleHtml(): string {
-		$this->view->setPath(DIR_PLUGIN . 'DataHawk');
+		$this->view->setPath(dirname(__DIR__, 2));
 		$this->view->setTemplate('Display/MaterializationAdminDisplay.php');
 		$this->view->assign('title', $this->getTitle());
 		$this->view->assign('viewName', $this->getViewName());
@@ -1111,7 +1111,7 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 
 	protected function loadTranslations(): void {
-		$this->view->setPath(DIR_PLUGIN . 'DataHawk');
+		$this->view->setPath(dirname(__DIR__, 2));
 		$this->view->loadBricks('Display');
 
 		$translations = $this->view->getBricks('datahawk_materialization_display');
