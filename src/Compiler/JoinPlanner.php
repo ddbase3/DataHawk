@@ -45,8 +45,8 @@ class JoinPlanner {
 	 * - Therefore "base3system_sysentry" and "base3system_sysentry AS peer"
 	 *   are two different graph nodes internally.
 	 *
-	 * The public query API does not change. This method still reads the existing
-	 * "table", "tablealias" and "variant" fields from normal element definitions.
+	 * Existing field expressions remain supported. An optional "joinOn" map
+	 * adds target-table equality predicates without moving them into WHERE.
 	 *
 	 * Tables inside subqueries must not trigger JOINs in the outer query.
 	 * Otherwise EXISTS(subquery) may accidentally introduce outer joins or duplicates.
@@ -69,7 +69,7 @@ class JoinPlanner {
 				$variant = $node['variant'] ?? null;
 
 				$this->aliasResolver->registerAlias($alias, $table);
-				$this->addJoinDependency($joins, $table, $alias, $variant);
+				$this->addJoinDependency($joins, $table, $alias, $variant, $node['joinOn'] ?? []);
 				continue;
 			}
 
@@ -87,7 +87,8 @@ class JoinPlanner {
 						$joins,
 						$join['table'],
 						$join['alias'],
-						$join['variant']
+						$join['variant'],
+						$join['joinOn'] ?? []
 					);
 				}
 			}
@@ -97,29 +98,40 @@ class JoinPlanner {
 	}
 
 	/**
-	 * Adds a dependency keyed by table and alias.
-	 *
-	 * This is the central change for alias-aware joins:
-	 * the key is not only the table name anymore.
+	 * Records a join dependency keyed by table and alias. Optional predicates
+	 * attach to the target alias; conflicting predicates are invalid.
 	 */
-	private function addJoinDependency(array &$joins, string $table, string $alias, mixed $variant): void {
-		$key = $this->getAliasNodeKey($table, $alias);
+	private function addJoinDependency(array &$joins, string $table, string $alias, mixed $variant, mixed $joinOn = []): void {
+		if(!is_array($joinOn) || ($joinOn !== [] && array_is_list($joinOn))) {
+			throw new QueryValidationException('Join predicates must be a field-to-value map.');
+		}
+		foreach($joinOn as $field => $value) {
+			if(!is_string($field) || !preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $field)) {
+				throw new QueryValidationException('Invalid join predicate field.');
+			}
+			if(!is_scalar($value) && $value !== null) {
+				throw new QueryValidationException('Join predicate values must be scalar or null.');
+			}
+		}
 
-		if (!isset($joins[$key])) {
+		$key = $this->getAliasNodeKey($table, $alias);
+		if(!isset($joins[$key])) {
 			$joins[$key] = [
 				'table' => $table,
 				'alias' => $alias,
-				'variant' => $variant
+				'variant' => $variant,
+				'joinOn' => $joinOn
 			];
 			return;
 		}
 
-		/*
-		 * If the same alias is referenced multiple times, required usage wins
-		 * over optional usage. This keeps filter joins strict, while optional
-		 * loader fields may still request LEFT JOIN behavior.
-		 */
-		if (!$this->isOptionalVariant($variant)) {
+		if($joinOn !== []) {
+			if($joins[$key]['joinOn'] !== [] && $joins[$key]['joinOn'] !== $joinOn) {
+				throw new QueryValidationException('Conflicting join predicates for alias: ' . $alias);
+			}
+			$joins[$key]['joinOn'] = $joinOn;
+		}
+		if(!$this->isOptionalVariant($variant)) {
 			$joins[$key]['variant'] = $variant;
 		}
 	}
@@ -227,7 +239,8 @@ class JoinPlanner {
 				$normalized[] = [
 					'table' => $value['table'],
 					'alias' => $value['alias'],
-					'variant' => $value['variant'] ?? null
+					'variant' => $value['variant'] ?? null,
+					'joinOn' => $value['joinOn'] ?? []
 				];
 				continue;
 			}
@@ -236,7 +249,8 @@ class JoinPlanner {
 				$normalized[] = [
 					'table' => $key,
 					'alias' => $key,
-					'variant' => $value
+					'variant' => $value,
+					'joinOn' => []
 				];
 			}
 		}
@@ -300,6 +314,15 @@ class JoinPlanner {
 				$onParts[] = $this->quoteJoinField($left, $step['from'], $currentAlias, $step['to'], $alias)
 					. ' = '
 					. $this->quoteJoinField($right, $step['from'], $currentAlias, $step['to'], $alias);
+			}
+
+			if($stepIndex === $lastStepIndex) {
+				foreach(($joinRequest['joinOn'] ?? []) as $field => $value) {
+					$column = $this->elementCompiler->quoteIdentifier($alias) . '.' . $this->elementCompiler->quoteIdentifier($field);
+					$onParts[] = $value === null
+						? $column . ' IS NULL'
+						: $column . ' = ' . $this->quoteJoinValue($value);
+				}
 			}
 
 			$resolvedTableName = $this->resolveTableName($table, $alias, 'select.join', $schema);
@@ -558,6 +581,14 @@ class JoinPlanner {
 		}
 
 		return implode('|', $parts);
+	}
+
+	/** @param string|int|float|bool $value */
+	private function quoteJoinValue(string|int|float|bool $value): string {
+		if(is_string($value)) {
+			return "'" . str_replace("'", "''", $value) . "'";
+		}
+		return $this->elementCompiler->quoteLiteral($value);
 	}
 
 	private function isOptionalVariant(mixed $variant): bool {

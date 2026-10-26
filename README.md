@@ -251,3 +251,9 @@ GPL 3.0. See BASE3 license for framework details.
 
 - [Frequently Asked Questions](docs/faq.md)
 - [Privacy and data processing](PRIVACY.md)
+
+## Optional equality predicates on joins
+
+A structured field reference may contain an optional `joinOn` map. Each entry is a target-side column name and a scalar or null literal. The join planner validates column names and values, groups references by the existing table alias, and compiles extra equality predicates inside the target join's `ON` clause. The schema remains the sole owner of relation keys and join types. Conflicting predicates for one alias are rejected.
+
+Example: `{"type":"fld","table":"attributes","tablealias":"department","field":"value","variant":"OPTIONAL","joinOn":{"attribute_id":"42"}}` joins only one attribute ID without changing the count of base rows when the attribute is absent. A second field may use a second alias of the same table and a different attribute ID. Previous field references and schema joins require no changes.
