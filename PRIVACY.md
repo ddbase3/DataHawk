@@ -366,3 +366,11 @@ Its central privacy-relevant boundaries are:
 - optional microservice transport when configured.
 
 A production deployment should therefore evaluate DataHawk as part of the complete data flow in which it is used, while keeping authorization and retention decisions at the application boundaries that own them.
+
+## Materialization Settings access
+
+Materialization tab metadata and translations remain within DataHawk.
+The matching feature is checked on materialization display HTML/JSON entry
+points; this adds no database, retains no separate grant cache and does not
+change manifest/table/run retention. Other access to underlying data must
+continue to be controlled at its owning query/backend boundary.

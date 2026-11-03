@@ -18,6 +18,9 @@
 
 namespace DataHawk\Display;
 
+use Base3\Usermanager\Permission;
+use Base3\Authorization\Dto\AuthorizationRequest;
+use Base3\Authorization\Api\IAuthorizationService;
 use Base3\Api\IAssetResolver;
 use Base3\Api\IContainer;
 use Base3\Api\IDisplay;
@@ -55,7 +58,8 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 		private readonly IAssetResolver $assetResolver,
 		private readonly ILinkTargetService $linkTargetService,
 		private readonly IDatabase $database,
-		private readonly IReportingScopeRegistry $reportingScopeRegistry
+		private readonly IReportingScopeRegistry $reportingScopeRegistry,
+		private readonly IAuthorizationService $settingsAuthorization
 	) {}
 
 	public function setData($data) {
@@ -63,6 +67,14 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 	}
 
 	public function getOutput(string $out = 'html', bool $final = false): string {
+		if (!$this->settingsAuthorization->decide(new AuthorizationRequest(
+			$this->settingsAuthorization->getDefaultAuthority(),
+			Permission::for('feature', $this->settingsTabFeatureName())
+		))->isAllowed()) {
+			http_response_code(403);
+			return '';
+		}
+
 		$this->loadTranslations();
 		$out = strtolower((string)$out);
 
@@ -72,6 +84,9 @@ abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {
 
 		return $this->handleHtml();
 	}
+
+	/** Returns the feature owned by the concrete settings entry. */
+	abstract protected function settingsTabFeatureName(): string;
 
 	abstract protected function getTitle(): string;
 

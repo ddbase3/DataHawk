@@ -15,7 +15,8 @@
 	"repository": "https://github.com/ddbase3/DataHawk",
 	"dependencies": {
 		"Base3Framework": ">=4.10.0",
+		"ClientStack": ">=4.23.0",
 		"ResourceFoundation": ">=4.5.0",
-		"ClientStack": ">=4.23.0"
+		"UiFoundation": ">=4.3.0"
 	}
 }

@@ -24,6 +24,10 @@ final class DataHawkMaterializationRegistryDisplay extends AbstractDataHawkMater
 		return 'datahawkmaterializationregistrydisplay';
 	}
 
+	protected function settingsTabFeatureName(): string {
+		return \DataHawk\SettingsTab\DatahawkmaterializationregistrySettingsTab::getName();
+	}
+
 	public function getHelp(): string {
 		$this->loadTranslations();
 
