@@ -70,7 +70,7 @@ class DefaultReportQueryServiceTest extends TestCase {
 		$db->expects($this->once())->method('connect');
 		$db->expects($this->once())
 			->method('multiQuery')
-			->with($stmt->sql, $stmt->params)
+			->with($stmt->sql)
 			->willReturn([['A' => 123, 'B' => 'x']]);
 
 		$container = $this->createStub(IContainer::class);

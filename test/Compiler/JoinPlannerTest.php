@@ -42,7 +42,7 @@ class JoinPlannerTest extends TestCase {
 		$result = $this->joinPlanner->collectJoinDependencies($nodes);
 
 		$this->assertSame(
-			['users' => 'OPTIONAL'],
+			['users::u' => ['table' => 'users', 'alias' => 'u', 'variant' => 'OPTIONAL', 'joinOn' => []]],
 			$result,
 			'Should collect table with variant'
 		);
@@ -70,8 +70,8 @@ class JoinPlannerTest extends TestCase {
 
 		$this->assertSame(
 			[
-				'orders' => null,
-				'users'  => 'HARD',
+				'orders::orders' => ['table' => 'orders', 'alias' => 'orders', 'variant' => null, 'joinOn' => []],
+				'users::users' => ['table' => 'users', 'alias' => 'users', 'variant' => 'HARD', 'joinOn' => []],
 			],
 			$result,
 			'Should recurse into nested nodes and collect both tables'
@@ -99,11 +99,12 @@ class JoinPlannerTest extends TestCase {
 
 	public function testCompileJoinsBuildsLeftJoinForDefaultLeftPathWithoutVariant(): void {
 		$from = 'users';
-		$joinRequests = ['orders' => null];
+		$joinRequests = [['table' => 'orders', 'alias' => 'o', 'variant' => null]];
 
 		$paths = [
 			[
 				[
+					'from' => 'users',
 					'to' => 'orders',
 					'meta' => [
 						'default' => true,
@@ -139,6 +140,7 @@ class JoinPlannerTest extends TestCase {
 		$paths = [
 			[
 				[
+					'from' => 'users',
 					'to' => 'profiles',
 					'meta' => [
 						'default' => false,

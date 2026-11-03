@@ -79,8 +79,13 @@ class DataHawkPluginTest extends TestCase {
 					continue;
 				}
 
-				$this->assertSame(IContainer::SHARED | IContainer::NOOVERWRITE, $call['flags']);
-				$this->assertIsCallable($call['definition'], "Service {$id} should be registered as a factory (callable)");
+				if ($id === IQuerySchemaProvider::class) {
+					$this->assertSame(IContainer::ALIAS | IContainer::NOOVERWRITE, $call['flags']);
+					$this->assertIsString($call['definition']);
+				} else {
+					$this->assertSame(IContainer::SHARED | IContainer::NOOVERWRITE, $call['flags']);
+					$this->assertIsCallable($call['definition']);
+				}
 				$found = true;
 				break;
 			}

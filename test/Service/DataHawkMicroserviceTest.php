@@ -12,56 +12,7 @@ use ResourceFoundation\Dto\TableMetadata;
 class DataHawkMicroserviceTest extends TestCase {
 
 	public function testDelegatesAllMethodsToUnderlyingService(): void {
-		$service = new class implements IQueryService, IMicroserviceConnector {
-
-			/** @var list<mixed> */
-			public array $calls = [];
-
-			public function getMicroserviceUrl() {
-				return 'http://fake';
-			}
-
-			public function listTables(): array {
-				$this->calls[] = 'listTables';
-				return ['tables'];
-			}
-
-			public function getTable(string $tableName): ?TableMetadata {
-				$this->calls[] = ['getTable', $tableName];
-				return new TableMetadata(
-					name: $tableName,
-					label: null,
-					description: null,
-					domain: 'd',
-					category: 'c',
-					tags: [],
-					fields: [],
-					joins: [],
-					defaultFilters: [],
-					sensitive: false
-				);
-			}
-
-			public function executeQuery(array $queryJson): QueryResult {
-				$this->calls[] = ['executeQuery', $queryJson];
-				return new QueryResult(columns: [], rows: [], debugSql: null, sensitive: false);
-			}
-
-			public function listDomains(): array {
-				$this->calls[] = 'listDomains';
-				return ['domains'];
-			}
-
-			public function listCategories(): array {
-				$this->calls[] = 'listCategories';
-				return ['categories'];
-			}
-
-			public function listTags(): array {
-				$this->calls[] = 'listTags';
-				return ['tags'];
-			}
-		};
+		$service = new DataHawkMicroserviceTestDouble1();
 
 		$ms = new DataHawkMicroservice($service);
 
@@ -96,3 +47,5 @@ class DataHawkMicroserviceTest extends TestCase {
 		$this->assertSame(['listTags'], $service->calls);
 	}
 }
+
+require_once __DIR__ . '/DataHawkMicroserviceTestDouble1.php';

@@ -14,13 +14,7 @@ class ElementCompilerTest extends TestCase {
                 $resolverRef = $resolver;
 
                 // Dummy-Compiler, der nur ein Objekt mit sql-Eigenschaft zurückgibt
-                $dummyCompiler = new class {
-                        public function compile(array $query): object {
-                                $o = new \stdClass();
-                                $o->sql = 'SELECT 1';
-                                return $o;
-                        }
-                };
+                $dummyCompiler = new ElementCompilerTestDouble1();
 
                 return new ElementCompiler($resolver, $dummyCompiler);
         }
@@ -464,7 +458,7 @@ class ElementCompilerTest extends TestCase {
                         ],
                 ]);
 
-                $this->assertSame('EXISTS ((SELECT 1))', $sqlExists);
+                $this->assertSame('EXISTS (SELECT 1)', $sqlExists);
 
                 // Default-Operator z.B. "=" mit 2 Parametern
                 $sqlDefault = $compiler->compileElement([
@@ -577,3 +571,5 @@ class ElementCompilerTest extends TestCase {
                 ]);
         }
 }
+
+require_once __DIR__ . '/ElementCompilerTestDouble1.php';

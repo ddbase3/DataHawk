@@ -35,36 +35,10 @@ class MysqlReportQueryCompilerTest extends TestCase {
 		$compiler = new MysqlReportQueryCompiler($schemaProvider);
 
 		// Anonymous subclass of QueryValidatorFactory that records last type.
-		$validatorFactory = new class($validator) extends QueryValidatorFactory {
-			public string $lastType = '';
-			private IReportQueryValidator $validator;
-
-			public function __construct(IReportQueryValidator $validator) {
-				$this->validator = $validator;
-			}
-
-			public function getValidator(string $type): IReportQueryValidator {
-				$this->lastType = $type;
-				return $this->validator;
-			}
-		};
+		$validatorFactory = new MysqlReportQueryCompilerTestDouble1($validator);
 
 		// Anonymous subclass of QueryCompilerFactory that records last type.
-		$compilerFactory = new class($typeCompiler) extends QueryCompilerFactory {
-			public string $lastType = '';
-			private IReportQueryTypeCompiler $typeCompiler;
-
-			public function __construct(IReportQueryTypeCompiler $typeCompiler) {
-				// We don't need parent constructor behavior for these tests,
-				// we just override getCompiler() completely.
-				$this->typeCompiler = $typeCompiler;
-			}
-
-			public function getCompiler(string $type): IReportQueryTypeCompiler {
-				$this->lastType = $type;
-				return $this->typeCompiler;
-			}
-		};
+		$compilerFactory = new MysqlReportQueryCompilerTestDouble2($typeCompiler);
 
 		$ref = new \ReflectionClass($compiler);
 
@@ -221,3 +195,7 @@ class MysqlReportQueryCompilerTest extends TestCase {
 		$compiler->compile($query);
 	}
 }
+
+require_once __DIR__ . '/MysqlReportQueryCompilerTestDouble1.php';
+
+require_once __DIR__ . '/MysqlReportQueryCompilerTestDouble2.php';
