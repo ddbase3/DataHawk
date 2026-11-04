@@ -128,3 +128,6 @@ final class DataHawkQuerySchemaProviderRegistryTest extends TestCase {
 		return new DataHawkQuerySchemaProviderRegistry($classMap, $this->createStub(IDatabase::class));
 	}
 }
+
+require_once __DIR__ . '/QuerySchemaDefinitionProviderFixture.php';
+require_once __DIR__ . '/MaterializationDefinitionProviderFixture.php';

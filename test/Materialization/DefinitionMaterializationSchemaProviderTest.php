@@ -248,3 +248,5 @@ final class DefinitionMaterializationSchemaProviderTest extends TestCase {
 		return new DefinitionMaterializationSchemaProvider($definitions, $database);
 	}
 }
+
+require_once __DIR__ . '/DataHawkDatabaseFixture.php';

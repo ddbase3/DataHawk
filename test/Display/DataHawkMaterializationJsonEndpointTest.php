@@ -566,3 +566,5 @@ final class DataHawkMaterializationJsonEndpointTest extends TestCase {
 		return json_decode($display->getOutput('json'), true, 512, JSON_THROW_ON_ERROR);
 	}
 }
+
+require_once __DIR__ . '/../Materialization/DataHawkDatabaseFixture.php';

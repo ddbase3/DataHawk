@@ -266,3 +266,5 @@ final class DefaultMaterializationServiceGenerationTest extends TestCase {
 		return new DefaultMaterializationService($provider, $queries, $registry, new MaterializationPhysicalTableNameGenerator(), null, $database);
 	}
 }
+
+require_once __DIR__ . '/DataHawkDatabaseFixture.php';

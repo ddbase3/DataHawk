@@ -147,3 +147,5 @@ final class DatabaseMaterializationRegistryTest extends TestCase {
 		self::assertCount(2, $database->nonQueries);
 	}
 }
+
+require_once __DIR__ . '/DataHawkDatabaseFixture.php';

@@ -128,3 +128,5 @@ final class ReportingScopeRegistryTest extends TestCase {
 		return new ReportingScopeRegistry($classMap);
 	}
 }
+
+require_once __DIR__ . '/ReportingScopeDefinitionProviderFixture.php';

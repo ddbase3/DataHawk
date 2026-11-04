@@ -161,3 +161,5 @@ final class DatabaseMaterializationRegistryEdgeCasesTest extends TestCase {
 		self::assertStringContainsString('WHERE id IN (251)', $deleteQueries[1]);
 	}
 }
+
+require_once __DIR__ . '/DataHawkDatabaseFixture.php';

@@ -174,3 +174,5 @@ final class ManifestMaterializationSchemaProviderTest extends TestCase {
 		file_put_contents($this->directory . '/' . $file, json_encode($data, JSON_THROW_ON_ERROR));
 	}
 }
+
+require_once __DIR__ . '/DataHawkDatabaseFixture.php';
