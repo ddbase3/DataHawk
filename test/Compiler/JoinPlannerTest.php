@@ -168,4 +168,40 @@ class JoinPlannerTest extends TestCase {
 		$expected = " LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id`";
 		$this->assertSame($expected, $sql);
 	}
+
+	public function testCollectDependenciesIgnoresSubqueriesAndNonArrayNodes(): void {
+		self::assertSame([], $this->joinPlanner->collectJoinDependencies([
+			'ignored',
+			['type' => 'subquery', 'element' => ['type' => 'fld', 'table' => 'private_table']],
+			['type' => 'fld', 'field' => 'id']
+		]));
+	}
+
+	public function testDuplicateAliasWithoutConflictingPredicatesIsMerged(): void {
+		$joins = $this->joinPlanner->collectJoinDependencies([
+			['type' => 'fld', 'table' => 'users', 'tablealias' => 'u', 'variant' => 'OPTIONAL'],
+			['type' => 'fld', 'table' => 'users', 'tablealias' => 'u', 'variant' => 'HARD', 'joinOn' => ['active' => 1]],
+			['type' => 'fld', 'table' => 'users', 'tablealias' => 'u', 'variant' => 'HARD', 'joinOn' => ['active' => 1]]
+		]);
+		self::assertCount(1, $joins);
+		self::assertSame('HARD', $joins['users::u']['variant']);
+		self::assertSame(['active' => 1], $joins['users::u']['joinOn']);
+	}
+
+	public function testInvalidJoinPredicateValueIsRejectedBeforeSqlCompilation(): void {
+		$this->expectException(QueryValidationException::class);
+		$this->expectExceptionMessage('scalar or null');
+		$this->joinPlanner->collectJoinDependencies([[
+			'type' => 'fld', 'table' => 'users', 'joinOn' => ['invalid' => ['nested' => true]]
+		]]);
+	}
+
+	public function testListShapedJoinPredicateMapIsRejected(): void {
+		$this->expectException(QueryValidationException::class);
+		$this->expectExceptionMessage('field-to-value map');
+		$this->joinPlanner->collectJoinDependencies([[
+			'type' => 'fld', 'table' => 'users', 'joinOn' => [1, 2]
+		]]);
+	}
+
 }

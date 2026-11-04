@@ -84,4 +84,52 @@ final class FileQuerySchemaProviderTest extends TestCase {
 		$this->expectExceptionMessage('Invalid schema JSON');
 		$provider->getSchema();
 	}
+
+	public function testRejectsMissingTableNameEvenForValidJson(): void {
+		file_put_contents($this->schemaDir . '/empty.json', '{"fields":[]}');
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('non-empty table name');
+		(new FileQuerySchemaProvider($this->schemaDir))->getSchema();
+	}
+
+	public function testRejectsFieldsWithoutNames(): void {
+		file_put_contents($this->schemaDir . '/orders.json', '{"name":"orders","fields":[{"type":"integer"}]}');
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('non-empty name');
+		(new FileQuerySchemaProvider($this->schemaDir))->getSchema();
+	}
+
+	public function testSchemaRemainsCachedAfterFileIsRemoved(): void {
+		file_put_contents($this->schemaDir . '/orders.json', '{"name":"orders"}');
+		$provider = new FileQuerySchemaProvider($this->schemaDir);
+		$schema = $provider->getSchema();
+		unlink($this->schemaDir . '/orders.json');
+		self::assertSame($schema, $provider->getSchema());
+		self::assertSame($schema[0], $provider->getTable('orders'));
+	}
+
+	public function testLoadsExtendedFieldAndJoinMetadata(): void {
+		file_put_contents($this->schemaDir . '/orders.json', json_encode([
+			'name' => 'orders', 'description' => 'Order facts', 'sensitive' => true,
+			'fields' => [[
+				'name' => 'customer_id', 'label' => 'Customer', 'type' => 'integer',
+				'nullable' => false, 'tags' => ['key'], 'alias' => 'customer', 'sensitive' => true
+			]],
+			'joins' => [[
+				'targetTable' => 'customers', 'on' => [['id' => 'customer_id']],
+				'type' => 'INNER', 'meta' => ['default' => true]
+			]]
+		], JSON_THROW_ON_ERROR));
+		$table = (new FileQuerySchemaProvider($this->schemaDir))->getSchema()[0];
+		self::assertSame('Order facts', $table->description);
+		self::assertTrue($table->sensitive);
+		self::assertSame('Customer', $table->fields[0]->description);
+		self::assertSame('customer', $table->fields[0]->alias);
+		self::assertSame(['key'], $table->fields[0]->tags);
+		self::assertTrue($table->fields[0]->sensitive);
+		self::assertFalse($table->fields[0]->nullable);
+		self::assertSame('INNER', $table->joins[0]->type);
+		self::assertSame(['default' => true], $table->joins[0]->meta);
+	}
+
 }

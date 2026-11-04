@@ -12,6 +12,7 @@ use ResourceFoundation\Dto\FieldMetadata;
 use ResourceFoundation\Dto\QueryResult;
 use ResourceFoundation\Dto\QueryStatement;
 use ResourceFoundation\Dto\TableMetadata;
+use ResourceFoundation\Exception\QueryValidationException;
 
 class DefaultReportQueryServiceTest extends TestCase {
 
@@ -238,6 +239,118 @@ class DefaultReportQueryServiceTest extends TestCase {
 		$tags = $svc->listTags();
 		sort($tags);
 		$this->assertSame(['a', 'b', 'x', 'y'], $tags);
+	}
+
+	public function testInsertWritesDataAndReportsAffectedRowsAndInsertId(): void {
+		$database = $this->createMock(IDatabase::class);
+		$database->expects($this->once())->method('connect');
+		$database->expects($this->once())->method('nonQuery')->with('INSERT INTO orders VALUES (1)');
+		$database->method('isError')->willReturn(false);
+		$database->method('affectedRows')->willReturn(1);
+		$database->method('insertId')->willReturn(42);
+		$compiler = $this->createStub(IQueryCompiler::class);
+		$compiler->method('compile')->willReturn(new QueryStatement('INSERT INTO orders VALUES (1)'));
+		$result = $this->queryService($database, $compiler)->executeQuery(['type' => 'insert']);
+
+		self::assertSame([], $result->rows);
+		self::assertSame('INSERT INTO orders VALUES (1)', $result->debugSql);
+		self::assertSame(1, $result->affectedRows);
+		self::assertSame(42, $result->insertId);
+	}
+
+	public function testAllSupportedWriteTypesUseNonQueryInsteadOfMultiQuery(): void {
+		foreach(['update', 'delete', 'create', 'alter', 'drop', 'rename', 'truncate'] as $type) {
+			$database = $this->createMock(IDatabase::class);
+			$database->expects($this->once())->method('nonQuery')->with('WRITE QUERY');
+			$database->expects($this->never())->method('multiQuery');
+			$database->method('isError')->willReturn(false);
+			$database->method('affectedRows')->willReturn(3);
+			$compiler = $this->createStub(IQueryCompiler::class);
+			$compiler->method('compile')->willReturn(new QueryStatement('WRITE QUERY'));
+			$result = $this->queryService($database, $compiler)->executeQuery(['type' => $type]);
+			self::assertSame(3, $result->affectedRows, $type);
+			self::assertNull($result->insertId, $type);
+		}
+	}
+
+	public function testWriteDatabaseErrorReturnsExplicitFailureResult(): void {
+		$database = $this->createMock(IDatabase::class);
+		$database->expects($this->once())->method('nonQuery');
+		$database->method('isError')->willReturn(true);
+		$database->method('errorMessage')->willReturn('write rejected');
+		$compiler = $this->createStub(IQueryCompiler::class);
+		$compiler->method('compile')->willReturn(new QueryStatement('UPDATE orders'));
+		$result = $this->queryService($database, $compiler)->executeQuery(['type' => 'update']);
+		self::assertSame([], $result->rows);
+		self::assertStringContainsString('DB Error: write rejected', $result->debugSql);
+		self::assertNull($result->affectedRows);
+	}
+
+	public function testSuccessfulTransactionCommitsAndCombinesAffectedRows(): void {
+		$database = $this->createMock(IDatabase::class);
+		$database->expects($this->once())->method('beginTransaction');
+		$database->expects($this->once())->method('commit');
+		$database->expects($this->never())->method('rollback');
+		$database->expects($this->exactly(2))->method('nonQuery');
+		$database->method('isError')->willReturn(false);
+		$database->method('affectedRows')->willReturn(2);
+		$database->method('insertId')->willReturn('remote-42');
+		$compiler = $this->createStub(IQueryCompiler::class);
+		$compiler->method('compile')->willReturnCallback(static fn(array $query): QueryStatement =>
+			new QueryStatement(strtoupper($query['type']) . ' QUERY')
+		);
+		$result = $this->queryService($database, $compiler)->executeQuery([
+			'type' => 'transaction',
+			'queries' => [['type' => 'update'], ['type' => 'insert']]
+		]);
+		self::assertSame(4, $result->affectedRows);
+		self::assertSame('remote-42', $result->insertId);
+		self::assertSame('INSERT QUERY', $result->debugSql);
+	}
+
+	public function testTransactionRequiresNonemptyArrayOfQueries(): void {
+		$database = $this->createMock(IDatabase::class);
+		$database->expects($this->never())->method('beginTransaction');
+		$this->expectException(QueryValidationException::class);
+		$this->expectExceptionMessage('non-empty');
+		$this->queryService($database)->executeQuery(['type' => 'transaction', 'queries' => []]);
+	}
+
+	public function testInvalidTransactionSubqueryIsRolledBack(): void {
+		$database = $this->createMock(IDatabase::class);
+		$database->expects($this->once())->method('beginTransaction');
+		$database->expects($this->once())->method('rollback');
+		$database->expects($this->never())->method('commit');
+		$this->expectException(QueryValidationException::class);
+		$this->expectExceptionMessage('Each transaction subquery');
+		$this->queryService($database)->executeQuery([
+			'type' => 'transaction', 'queries' => [['missing_type' => true]]
+		]);
+	}
+
+	public function testTransactionRollsBackWhenNestedDatabaseWriteFails(): void {
+		$database = $this->createMock(IDatabase::class);
+		$database->expects($this->once())->method('beginTransaction');
+		$database->expects($this->once())->method('rollback');
+		$database->expects($this->never())->method('commit');
+		$database->expects($this->once())->method('nonQuery')->willThrowException(new \RuntimeException('disk unavailable'));
+		$compiler = $this->createStub(IQueryCompiler::class);
+		$compiler->method('compile')->willReturn(new QueryStatement('UPDATE orders'));
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('Transaction subquery failed');
+		$this->queryService($database, $compiler)->executeQuery([
+			'type' => 'transaction', 'queries' => [['type' => 'update']]
+		]);
+	}
+
+	private function queryService(IDatabase $database, ?IQueryCompiler $compiler = null): DefaultReportQueryService {
+		$container = $this->createStub(IContainer::class);
+		$container->method('get')->with('database')->willReturn($database);
+		return new DefaultReportQueryService(
+			$this->createStub(IQuerySchemaProvider::class),
+			$compiler ?? $this->createStub(IQueryCompiler::class),
+			$container
+		);
 	}
 
 	private function makeTable(
