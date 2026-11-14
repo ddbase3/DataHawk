@@ -16,11 +16,11 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Materialization;
+namespace Base3\DataHawk\Materialization;
 
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\ITableNameResolver;
-use ResourceFoundation\Dto\TableNameResolutionContext;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\ITableNameResolver;
+use Base3\ResourceFoundation\Dto\TableNameResolutionContext;
 
 class MaterializationTableNameResolver implements ITableNameResolver {
 

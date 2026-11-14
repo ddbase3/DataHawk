@@ -1,27 +1,42 @@
 <?php declare(strict_types=1);
 
-namespace DataHawk\Test\Display;
+/***********************************************************************
+ * This file is part of DataHawk for BASE3 Framework.
+ *
+ * DataHawk extends BASE3 with schema-driven reporting and data queries.
+ * Structured query definitions compile to backend-specific statements.
+ * Execution uses the shared BASE3 database and resource contracts.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/datahawk
+ * https://github.com/ddbase3/DataHawk
+ **********************************************************************/
 
-use Base3\Api\IAssetResolver;
-use Base3\Api\IContainer;
-use Base3\Api\IMvcView;
-use Base3\Api\IRequest;
-use Base3\Authorization\Api\IAuthorizationService;
-use Base3\Authorization\Dto\AuthorizationDecision;
-use Base3\LinkTarget\Api\ILinkTargetService;
-use Base3\State\Api\IStateStore;
-use DataHawk\Display\DataHawkMaterializationOverviewDisplay;
-use DataHawk\Test\Materialization\DataHawkDatabaseFixture;
+namespace Base3\DataHawk\Test\Display;
+
+use Base3\CoreFoundation\Api\IAssetResolver;
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Api\IMvcView;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Authorization\Api\IAuthorizationService;
+use Base3\CoreFoundation\Authorization\Dto\AuthorizationDecision;
+use Base3\CoreFoundation\LinkTarget\Api\ILinkTargetService;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\DataHawk\Display\DataHawkMaterializationOverviewDisplay;
+use Base3\DataHawk\Test\Materialization\DataHawkDatabaseFixture;
 use PHPUnit\Framework\TestCase;
-use ResourceFoundation\Api\IMaterializationManifestProvider;
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\IMaterializationService;
-use ResourceFoundation\Api\IReportingScopeRegistry;
-use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
-use ResourceFoundation\Dto\MaterializationGeneration;
-use ResourceFoundation\Dto\MaterializationManifest;
-use ResourceFoundation\Dto\MaterializationRunResult;
-use ResourceFoundation\Dto\ReportingScopeDefinition;
+use Base3\ResourceFoundation\Api\IMaterializationManifestProvider;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\IMaterializationService;
+use Base3\ResourceFoundation\Api\IReportingScopeRegistry;
+use Base3\ResourceFoundation\Api\IScopedMaterializationManifestProvider;
+use Base3\ResourceFoundation\Dto\MaterializationGeneration;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
+use Base3\ResourceFoundation\Dto\MaterializationRunResult;
+use Base3\ResourceFoundation\Dto\ReportingScopeDefinition;
 
 final class DataHawkMaterializationJsonEndpointTest extends TestCase {
 

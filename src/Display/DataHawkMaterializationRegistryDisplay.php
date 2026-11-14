@@ -16,7 +16,7 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Display;
+namespace Base3\DataHawk\Display;
 
 final class DataHawkMaterializationRegistryDisplay extends AbstractDataHawkMaterializationDisplay {
 
@@ -25,7 +25,7 @@ final class DataHawkMaterializationRegistryDisplay extends AbstractDataHawkMater
 	}
 
 	protected function settingsTabFeatureName(): string {
-		return \DataHawk\SettingsTab\DatahawkmaterializationregistrySettingsTab::getName();
+		return \Base3\DataHawk\SettingsTab\DatahawkmaterializationregistrySettingsTab::getName();
 	}
 
 	public function getHelp(): string {

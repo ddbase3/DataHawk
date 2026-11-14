@@ -16,7 +16,7 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Compiler;
+namespace Base3\DataHawk\Compiler;
 
 class AliasResolver {
 

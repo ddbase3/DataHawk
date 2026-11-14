@@ -16,9 +16,9 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Materialization;
+namespace Base3\DataHawk\Materialization;
 
-use ResourceFoundation\Dto\MaterializationManifest;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
 
 class MaterializationPhysicalTableNameGenerator {
 

@@ -16,10 +16,10 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Compiler;
+namespace Base3\DataHawk\Compiler;
 
-use DataHawk\Api\IReportQueryValidator;
-use ResourceFoundation\Exception\QueryValidationException;
+use Base3\DataHawk\Api\IReportQueryValidator;
+use Base3\ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Validates 'select' queries, including standard and UNION queries.

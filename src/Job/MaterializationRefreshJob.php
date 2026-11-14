@@ -16,18 +16,18 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Job;
+namespace Base3\DataHawk\Job;
 
-use Base3\Api\IContainer;
-use Base3\Configuration\Api\IConfiguration;
-use Base3\State\Api\IStateStore;
-use Base3\Worker\Api\IJob;
-use DataHawk\Materialization\DatabaseMaterializationRegistry;
-use DataHawk\Materialization\MaterializationRefreshPlanner;
-use ResourceFoundation\Api\IMaterializationManifestProvider;
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\IMaterializationService;
-use ResourceFoundation\Dto\MaterializationRunResult;
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Configuration\Api\IConfiguration;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\CoreFoundation\Worker\Api\IJob;
+use Base3\DataHawk\Materialization\DatabaseMaterializationRegistry;
+use Base3\DataHawk\Materialization\MaterializationRefreshPlanner;
+use Base3\ResourceFoundation\Api\IMaterializationManifestProvider;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\IMaterializationService;
+use Base3\ResourceFoundation\Dto\MaterializationRunResult;
 use Throwable;
 
 /**

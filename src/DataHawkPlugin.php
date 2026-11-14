@@ -16,35 +16,35 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk;
+namespace Base3\DataHawk;
 
-use Base3\Api\ICheck;
-use Base3\Api\IClassMap;
-use Base3\Api\IContainer;
-use Base3\Api\IPlugin;
-use Base3\Database\Api\IDatabase;
-use DataHawk\Compiler\MysqlReportQueryCompiler;
-use DataHawk\Materialization\CompositeMaterializationSchemaProvider;
-use DataHawk\Materialization\DatabaseMaterializationRegistry;
-use DataHawk\Materialization\DefaultMaterializationService;
-use DataHawk\Materialization\MaterializationPhysicalTableNameGenerator;
-use DataHawk\Materialization\MaterializationTableNameResolver;
-use DataHawk\Reporting\ReportingScopeRegistry;
-use DataHawk\Schema\CompositeQuerySchemaProvider;
-use DataHawk\Schema\DataHawkQuerySchemaProviderRegistry;
-use DataHawk\Service\DefaultReportQueryService;
-use ResourceFoundation\Api\IMaterializationManifestProvider;
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\IMaterializationRunRepository;
-use ResourceFoundation\Api\IMaterializationSchemaProvider;
-use ResourceFoundation\Api\IMaterializationService;
-use ResourceFoundation\Api\IQueryCompiler;
-use ResourceFoundation\Api\IQuerySchemaProvider;
-use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Api\IReportingScopeRegistry;
-use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
-use ResourceFoundation\Api\IScopedQuerySchemaProvider;
-use ResourceFoundation\Api\ITableNameResolver;
+use Base3\CoreFoundation\Api\ICheck;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Api\IPlugin;
+use Base3\CoreFoundation\Database\Api\IDatabase;
+use Base3\DataHawk\Compiler\MysqlReportQueryCompiler;
+use Base3\DataHawk\Materialization\CompositeMaterializationSchemaProvider;
+use Base3\DataHawk\Materialization\DatabaseMaterializationRegistry;
+use Base3\DataHawk\Materialization\DefaultMaterializationService;
+use Base3\DataHawk\Materialization\MaterializationPhysicalTableNameGenerator;
+use Base3\DataHawk\Materialization\MaterializationTableNameResolver;
+use Base3\DataHawk\Reporting\ReportingScopeRegistry;
+use Base3\DataHawk\Schema\CompositeQuerySchemaProvider;
+use Base3\DataHawk\Schema\DataHawkQuerySchemaProviderRegistry;
+use Base3\DataHawk\Service\DefaultReportQueryService;
+use Base3\ResourceFoundation\Api\IMaterializationManifestProvider;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\IMaterializationRunRepository;
+use Base3\ResourceFoundation\Api\IMaterializationSchemaProvider;
+use Base3\ResourceFoundation\Api\IMaterializationService;
+use Base3\ResourceFoundation\Api\IQueryCompiler;
+use Base3\ResourceFoundation\Api\IQuerySchemaProvider;
+use Base3\ResourceFoundation\Api\IQueryService;
+use Base3\ResourceFoundation\Api\IReportingScopeRegistry;
+use Base3\ResourceFoundation\Api\IScopedMaterializationManifestProvider;
+use Base3\ResourceFoundation\Api\IScopedQuerySchemaProvider;
+use Base3\ResourceFoundation\Api\ITableNameResolver;
 
 class DataHawkPlugin implements IPlugin, ICheck {
 

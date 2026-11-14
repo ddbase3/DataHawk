@@ -16,9 +16,9 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Compiler;
+namespace Base3\DataHawk\Compiler;
 
-use ResourceFoundation\Exception\QueryValidationException;
+use Base3\ResourceFoundation\Exception\QueryValidationException;
 
 class ElementCompiler {
 

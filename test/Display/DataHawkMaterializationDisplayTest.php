@@ -1,23 +1,38 @@
 <?php declare(strict_types=1);
 
-namespace DataHawk\Test\Display;
+/***********************************************************************
+ * This file is part of DataHawk for BASE3 Framework.
+ *
+ * DataHawk extends BASE3 with schema-driven reporting and data queries.
+ * Structured query definitions compile to backend-specific statements.
+ * Execution uses the shared BASE3 database and resource contracts.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/datahawk
+ * https://github.com/ddbase3/DataHawk
+ **********************************************************************/
 
-use Base3\Api\IAssetResolver;
-use Base3\Api\IContainer;
-use Base3\Api\IMvcView;
-use Base3\Api\IRequest;
-use Base3\Authorization\Api\IAuthorizationService;
-use Base3\Authorization\Dto\AuthorizationDecision;
-use Base3\Authorization\Dto\AuthorizationRequest;
-use Base3\Database\Api\IDatabase;
-use Base3\LinkTarget\Api\ILinkTargetService;
-use DataHawk\Display\DataHawkMaterializationManifestDisplay;
-use DataHawk\Display\DataHawkMaterializationOverviewDisplay;
-use DataHawk\Display\DataHawkMaterializationRegistryDisplay;
-use DataHawk\Display\DataHawkMaterializationRunDisplay;
-use DataHawk\Display\DataHawkMaterializationTableDisplay;
+namespace Base3\DataHawk\Test\Display;
+
+use Base3\CoreFoundation\Api\IAssetResolver;
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Api\IMvcView;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Authorization\Api\IAuthorizationService;
+use Base3\CoreFoundation\Authorization\Dto\AuthorizationDecision;
+use Base3\CoreFoundation\Authorization\Dto\AuthorizationRequest;
+use Base3\CoreFoundation\Database\Api\IDatabase;
+use Base3\CoreFoundation\LinkTarget\Api\ILinkTargetService;
+use Base3\DataHawk\Display\DataHawkMaterializationManifestDisplay;
+use Base3\DataHawk\Display\DataHawkMaterializationOverviewDisplay;
+use Base3\DataHawk\Display\DataHawkMaterializationRegistryDisplay;
+use Base3\DataHawk\Display\DataHawkMaterializationRunDisplay;
+use Base3\DataHawk\Display\DataHawkMaterializationTableDisplay;
 use PHPUnit\Framework\TestCase;
-use ResourceFoundation\Api\IReportingScopeRegistry;
+use Base3\ResourceFoundation\Api\IReportingScopeRegistry;
 
 final class DataHawkMaterializationDisplayTest extends TestCase {
 

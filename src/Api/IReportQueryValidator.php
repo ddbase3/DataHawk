@@ -16,7 +16,7 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Api;
+namespace Base3\DataHawk\Api;
 
 /**
  * Interface IReportQueryValidator
@@ -35,7 +35,7 @@ interface IReportQueryValidator {
 	 *
 	 * @param array $query The query structure to validate
 	 *
-	 * @throws \ResourceFoundation\Exception\QueryValidationException If validation fails
+	 * @throws \Base3\ResourceFoundation\Exception\QueryValidationException If validation fails
 	 */
 	public function validate(array $query): void;
 }

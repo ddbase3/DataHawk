@@ -16,28 +16,28 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Display;
+namespace Base3\DataHawk\Display;
 
-use Base3\Usermanager\Permission;
-use Base3\Authorization\Dto\AuthorizationRequest;
-use Base3\Authorization\Api\IAuthorizationService;
-use Base3\Api\IAssetResolver;
-use Base3\Api\IContainer;
-use Base3\Api\IDisplay;
-use Base3\Api\IMvcView;
-use Base3\Api\IRequest;
-use Base3\Database\Api\IDatabase;
-use Base3\LinkTarget\Api\ILinkTargetService;
-use Base3\State\Api\IStateStore;
-use DataHawk\Materialization\MaterializationRefreshPlanner;
-use ResourceFoundation\Api\IMaterializationManifestProvider;
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\IMaterializationService;
-use ResourceFoundation\Api\IReportingScopeRegistry;
-use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
-use ResourceFoundation\Dto\MaterializationManifest;
-use ResourceFoundation\Dto\MaterializationRunResult;
-use ResourceFoundation\Dto\ReportingScopeDefinition;
+use Base3\CoreFoundation\Usermanager\Permission;
+use Base3\CoreFoundation\Authorization\Dto\AuthorizationRequest;
+use Base3\CoreFoundation\Authorization\Api\IAuthorizationService;
+use Base3\CoreFoundation\Api\IAssetResolver;
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Api\IDisplay;
+use Base3\CoreFoundation\Api\IMvcView;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Database\Api\IDatabase;
+use Base3\CoreFoundation\LinkTarget\Api\ILinkTargetService;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\DataHawk\Materialization\MaterializationRefreshPlanner;
+use Base3\ResourceFoundation\Api\IMaterializationManifestProvider;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\IMaterializationService;
+use Base3\ResourceFoundation\Api\IReportingScopeRegistry;
+use Base3\ResourceFoundation\Api\IScopedMaterializationManifestProvider;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
+use Base3\ResourceFoundation\Dto\MaterializationRunResult;
+use Base3\ResourceFoundation\Dto\ReportingScopeDefinition;
 use Throwable;
 
 abstract class AbstractDataHawkMaterializationDisplay implements IDisplay {

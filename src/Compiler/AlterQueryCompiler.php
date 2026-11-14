@@ -16,10 +16,10 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Compiler;
+namespace Base3\DataHawk\Compiler;
 
-use DataHawk\Api\IReportQueryTypeCompiler;
-use ResourceFoundation\Dto\QueryStatement;
+use Base3\DataHawk\Api\IReportQueryTypeCompiler;
+use Base3\ResourceFoundation\Dto\QueryStatement;
 
 /**
  * Compiles ALTER TABLE queries to SQL.

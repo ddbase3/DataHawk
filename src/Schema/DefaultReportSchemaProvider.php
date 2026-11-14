@@ -16,9 +16,9 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Schema;
+namespace Base3\DataHawk\Schema;
 
-use Base3\Configuration\Api\IConfiguration;
+use Base3\CoreFoundation\Configuration\Api\IConfiguration;
 
 class DefaultReportSchemaProvider extends FileQuerySchemaProvider {
 

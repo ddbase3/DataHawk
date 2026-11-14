@@ -112,7 +112,7 @@ The normal central composition uses discoverable definition providers rather tha
 
 ## What is returned by a query?
 
-`IQueryService::executeQuery()` returns `ResourceFoundation\Dto\QueryResult`.
+`IQueryService::executeQuery()` returns `Base3\ResourceFoundation\Dto\QueryResult`.
 
 For SELECT queries the result can contain:
 

@@ -16,13 +16,13 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Materialization;
+namespace Base3\DataHawk\Materialization;
 
-use Base3\Database\Api\IDatabase;
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\IMaterializationRunRepository;
-use ResourceFoundation\Dto\MaterializationGeneration;
-use ResourceFoundation\Dto\MaterializationManifest;
+use Base3\CoreFoundation\Database\Api\IDatabase;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\IMaterializationRunRepository;
+use Base3\ResourceFoundation\Dto\MaterializationGeneration;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
 use RuntimeException;
 
 class DatabaseMaterializationRegistry implements IMaterializationRegistry, IMaterializationRunRepository {

@@ -16,12 +16,12 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Schema;
+namespace Base3\DataHawk\Schema;
 
-use ResourceFoundation\Api\IQuerySchemaProvider;
-use ResourceFoundation\Dto\FieldMetadata;
-use ResourceFoundation\Dto\JoinMetadata;
-use ResourceFoundation\Dto\TableMetadata;
+use Base3\ResourceFoundation\Api\IQuerySchemaProvider;
+use Base3\ResourceFoundation\Dto\FieldMetadata;
+use Base3\ResourceFoundation\Dto\JoinMetadata;
+use Base3\ResourceFoundation\Dto\TableMetadata;
 
 class FileQuerySchemaProvider implements IQuerySchemaProvider {
 

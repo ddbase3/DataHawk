@@ -16,15 +16,15 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Materialization;
+namespace Base3\DataHawk\Materialization;
 
-use Base3\Database\Api\IDatabase;
-use ResourceFoundation\Api\IMaterializationSchemaProvider;
-use ResourceFoundation\Dto\FieldMetadata;
-use ResourceFoundation\Dto\ForeignKeyReference;
-use ResourceFoundation\Dto\JoinMetadata;
-use ResourceFoundation\Dto\MaterializationManifest;
-use ResourceFoundation\Dto\TableMetadata;
+use Base3\CoreFoundation\Database\Api\IDatabase;
+use Base3\ResourceFoundation\Api\IMaterializationSchemaProvider;
+use Base3\ResourceFoundation\Dto\FieldMetadata;
+use Base3\ResourceFoundation\Dto\ForeignKeyReference;
+use Base3\ResourceFoundation\Dto\JoinMetadata;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
+use Base3\ResourceFoundation\Dto\TableMetadata;
 
 class ManifestMaterializationSchemaProvider implements IMaterializationSchemaProvider {
 

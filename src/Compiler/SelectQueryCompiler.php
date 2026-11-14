@@ -16,16 +16,16 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Compiler;
+namespace Base3\DataHawk\Compiler;
 
-use DataHawk\Api\IReportQueryTypeCompiler;
-use DataHawk\Util\Graph;
-use ResourceFoundation\Api\IQuerySchemaProvider;
-use ResourceFoundation\Api\IScopedQuerySchemaProvider;
-use ResourceFoundation\Api\ITableNameResolver;
-use ResourceFoundation\Dto\QueryStatement;
-use ResourceFoundation\Dto\TableNameResolutionContext;
-use ResourceFoundation\Exception\QueryValidationException;
+use Base3\DataHawk\Api\IReportQueryTypeCompiler;
+use Base3\DataHawk\Util\Graph;
+use Base3\ResourceFoundation\Api\IQuerySchemaProvider;
+use Base3\ResourceFoundation\Api\IScopedQuerySchemaProvider;
+use Base3\ResourceFoundation\Api\ITableNameResolver;
+use Base3\ResourceFoundation\Dto\QueryStatement;
+use Base3\ResourceFoundation\Dto\TableNameResolutionContext;
+use Base3\ResourceFoundation\Exception\QueryValidationException;
 
 class SelectQueryCompiler implements IReportQueryTypeCompiler {
 
@@ -210,7 +210,7 @@ class SelectQueryCompiler implements IReportQueryTypeCompiler {
 	}
 
 	/**
-	 * @return array<int,\ResourceFoundation\Dto\TableMetadata>
+	 * @return array<int,\Base3\ResourceFoundation\Dto\TableMetadata>
 	 */
 	private function getSchemaForQuery(string $scope): array {
 		if(!$this->schemaProvider instanceof IScopedQuerySchemaProvider) {

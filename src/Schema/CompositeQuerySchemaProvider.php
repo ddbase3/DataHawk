@@ -16,12 +16,12 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Schema;
+namespace Base3\DataHawk\Schema;
 
-use Base3\Api\IServiceRegistry;
-use ResourceFoundation\Api\IQuerySchemaProvider;
-use ResourceFoundation\Api\IScopedQuerySchemaProvider;
-use ResourceFoundation\Dto\TableMetadata;
+use Base3\CoreFoundation\Api\IServiceRegistry;
+use Base3\ResourceFoundation\Api\IQuerySchemaProvider;
+use Base3\ResourceFoundation\Api\IScopedQuerySchemaProvider;
+use Base3\ResourceFoundation\Dto\TableMetadata;
 
 class CompositeQuerySchemaProvider implements IScopedQuerySchemaProvider {
 

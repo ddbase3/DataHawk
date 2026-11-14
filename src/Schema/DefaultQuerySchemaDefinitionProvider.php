@@ -16,10 +16,10 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Schema;
+namespace Base3\DataHawk\Schema;
 
-use Base3\Configuration\Api\IConfiguration;
-use ResourceFoundation\Api\IQuerySchemaDefinitionProvider;
+use Base3\CoreFoundation\Configuration\Api\IConfiguration;
+use Base3\ResourceFoundation\Api\IQuerySchemaDefinitionProvider;
 
 final class DefaultQuerySchemaDefinitionProvider implements IQuerySchemaDefinitionProvider {
 

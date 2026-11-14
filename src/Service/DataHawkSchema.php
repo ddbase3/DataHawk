@@ -16,11 +16,11 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Service;
+namespace Base3\DataHawk\Service;
 
-use Base3\Api\IOutput;
-use Base3\Api\IRequest;
-use ResourceFoundation\Api\IQueryService;
+use Base3\CoreFoundation\Api\IOutput;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\ResourceFoundation\Api\IQueryService;
 
 class DataHawkSchema implements IOutput {
 

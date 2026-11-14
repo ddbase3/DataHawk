@@ -16,19 +16,19 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Materialization;
+namespace Base3\DataHawk\Materialization;
 
-use Base3\Database\Api\IDatabase;
-use ResourceFoundation\Api\IMaterializationManifestProvider;
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\IMaterializationRunRepository;
-use ResourceFoundation\Api\IMaterializationService;
-use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Dto\MaterializationGeneration;
-use ResourceFoundation\Dto\MaterializationManifest;
-use ResourceFoundation\Dto\MaterializationRunResult;
-use ResourceFoundation\Dto\QueryResult;
-use ResourceFoundation\Exception\MaterializationException;
+use Base3\CoreFoundation\Database\Api\IDatabase;
+use Base3\ResourceFoundation\Api\IMaterializationManifestProvider;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\IMaterializationRunRepository;
+use Base3\ResourceFoundation\Api\IMaterializationService;
+use Base3\ResourceFoundation\Api\IQueryService;
+use Base3\ResourceFoundation\Dto\MaterializationGeneration;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
+use Base3\ResourceFoundation\Dto\MaterializationRunResult;
+use Base3\ResourceFoundation\Dto\QueryResult;
+use Base3\ResourceFoundation\Exception\MaterializationException;
 
 class DefaultMaterializationService implements IMaterializationService {
 

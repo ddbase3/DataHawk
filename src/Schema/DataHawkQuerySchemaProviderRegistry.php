@@ -16,15 +16,15 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Schema;
+namespace Base3\DataHawk\Schema;
 
-use Base3\Api\IClassMap;
+use Base3\CoreFoundation\Api\IClassMap;
 use Base3\Core\DefaultServiceRegistry;
-use Base3\Database\Api\IDatabase;
-use DataHawk\Materialization\DefinitionMaterializationSchemaProvider;
-use ResourceFoundation\Api\IMaterializationDefinitionProvider;
-use ResourceFoundation\Api\IQuerySchemaDefinitionProvider;
-use ResourceFoundation\Api\IQuerySchemaProvider;
+use Base3\CoreFoundation\Database\Api\IDatabase;
+use Base3\DataHawk\Materialization\DefinitionMaterializationSchemaProvider;
+use Base3\ResourceFoundation\Api\IMaterializationDefinitionProvider;
+use Base3\ResourceFoundation\Api\IQuerySchemaDefinitionProvider;
+use Base3\ResourceFoundation\Api\IQuerySchemaProvider;
 
 class DataHawkQuerySchemaProviderRegistry extends DefaultServiceRegistry {
 

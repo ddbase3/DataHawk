@@ -16,12 +16,12 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Reporting;
+namespace Base3\DataHawk\Reporting;
 
-use Base3\Api\IClassMap;
-use ResourceFoundation\Api\IReportingScopeDefinitionProvider;
-use ResourceFoundation\Api\IReportingScopeRegistry;
-use ResourceFoundation\Dto\ReportingScopeDefinition;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\ResourceFoundation\Api\IReportingScopeDefinitionProvider;
+use Base3\ResourceFoundation\Api\IReportingScopeRegistry;
+use Base3\ResourceFoundation\Dto\ReportingScopeDefinition;
 
 final class ReportingScopeRegistry implements IReportingScopeRegistry {
 

@@ -16,12 +16,12 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Compiler;
+namespace Base3\DataHawk\Compiler;
 
-use DataHawk\Api\IReportQueryTypeCompiler;
-use ResourceFoundation\Api\IQuerySchemaProvider;
-use ResourceFoundation\Api\ITableNameResolver;
-use ResourceFoundation\Exception\QueryValidationException;
+use Base3\DataHawk\Api\IReportQueryTypeCompiler;
+use Base3\ResourceFoundation\Api\IQuerySchemaProvider;
+use Base3\ResourceFoundation\Api\ITableNameResolver;
+use Base3\ResourceFoundation\Exception\QueryValidationException;
 
 /**
  * Factory for retrieving the appropriate query compiler instance

@@ -16,12 +16,12 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Compiler;
+namespace Base3\DataHawk\Compiler;
 
-use DataHawk\Util\Graph;
-use ResourceFoundation\Api\ITableNameResolver;
-use ResourceFoundation\Dto\TableNameResolutionContext;
-use ResourceFoundation\Exception\QueryValidationException;
+use Base3\DataHawk\Util\Graph;
+use Base3\ResourceFoundation\Api\ITableNameResolver;
+use Base3\ResourceFoundation\Dto\TableNameResolutionContext;
+use Base3\ResourceFoundation\Exception\QueryValidationException;
 
 class JoinPlanner {
 

@@ -16,9 +16,9 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Materialization;
+namespace Base3\DataHawk\Materialization;
 
-use ResourceFoundation\Api\IMaterializationDefinitionProvider;
+use Base3\ResourceFoundation\Api\IMaterializationDefinitionProvider;
 
 final class DefaultMaterializationDefinitionProvider implements IMaterializationDefinitionProvider {
 

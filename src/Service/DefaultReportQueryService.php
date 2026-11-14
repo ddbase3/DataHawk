@@ -16,17 +16,17 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Service;
+namespace Base3\DataHawk\Service;
 
-use Base3\Api\IContainer;
-use Base3\Database\Api\IDatabase;
-use ResourceFoundation\Api\IQueryCompiler;
-use ResourceFoundation\Api\IQuerySchemaProvider;
-use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Dto\QueryResult;
-use ResourceFoundation\Dto\TableMetadata;
-use ResourceFoundation\Exception\AccessDeniedException;
-use ResourceFoundation\Exception\QueryValidationException;
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Database\Api\IDatabase;
+use Base3\ResourceFoundation\Api\IQueryCompiler;
+use Base3\ResourceFoundation\Api\IQuerySchemaProvider;
+use Base3\ResourceFoundation\Api\IQueryService;
+use Base3\ResourceFoundation\Dto\QueryResult;
+use Base3\ResourceFoundation\Dto\TableMetadata;
+use Base3\ResourceFoundation\Exception\AccessDeniedException;
+use Base3\ResourceFoundation\Exception\QueryValidationException;
 
 class DefaultReportQueryService implements IQueryService {
 

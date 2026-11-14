@@ -16,9 +16,9 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Api;
+namespace Base3\DataHawk\Api;
 
-use ResourceFoundation\Dto\QueryStatement;
+use Base3\ResourceFoundation\Dto\QueryStatement;
 
 /**
  * Interface for compilers that handle a specific report query type

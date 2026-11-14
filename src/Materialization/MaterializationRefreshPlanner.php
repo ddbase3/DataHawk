@@ -16,14 +16,14 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Materialization;
+namespace Base3\DataHawk\Materialization;
 
-use Base3\State\Api\IStateStore;
-use ResourceFoundation\Api\IMaterializationManifestProvider;
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
-use ResourceFoundation\Dto\MaterializationManifest;
-use ResourceFoundation\Dto\MaterializationRunResult;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\ResourceFoundation\Api\IMaterializationManifestProvider;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\IScopedMaterializationManifestProvider;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
+use Base3\ResourceFoundation\Dto\MaterializationRunResult;
 use RuntimeException;
 
 class MaterializationRefreshPlanner {

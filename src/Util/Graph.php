@@ -16,7 +16,7 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Util;
+namespace Base3\DataHawk\Util;
 
 /**
  * A simple directed graph with labeled edges and optional metadata.

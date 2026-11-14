@@ -1,18 +1,33 @@
 <?php declare(strict_types=1);
 
-namespace DataHawk\Test\Job;
+/***********************************************************************
+ * This file is part of DataHawk for BASE3 Framework.
+ *
+ * DataHawk extends BASE3 with schema-driven reporting and data queries.
+ * Structured query definitions compile to backend-specific statements.
+ * Execution uses the shared BASE3 database and resource contracts.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/datahawk
+ * https://github.com/ddbase3/DataHawk
+ **********************************************************************/
 
-use Base3\Api\IContainer;
-use Base3\Configuration\Api\IConfiguration;
-use Base3\State\Api\IStateStore;
-use DataHawk\Job\MaterializationRefreshJob;
-use DataHawk\Materialization\DatabaseMaterializationRegistry;
+namespace Base3\DataHawk\Test\Job;
+
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Configuration\Api\IConfiguration;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\DataHawk\Job\MaterializationRefreshJob;
+use Base3\DataHawk\Materialization\DatabaseMaterializationRegistry;
 use PHPUnit\Framework\TestCase;
-use ResourceFoundation\Api\IMaterializationManifestProvider;
-use ResourceFoundation\Api\IMaterializationRegistry;
-use ResourceFoundation\Api\IMaterializationService;
-use ResourceFoundation\Dto\MaterializationManifest;
-use ResourceFoundation\Dto\MaterializationRunResult;
+use Base3\ResourceFoundation\Api\IMaterializationManifestProvider;
+use Base3\ResourceFoundation\Api\IMaterializationRegistry;
+use Base3\ResourceFoundation\Api\IMaterializationService;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
+use Base3\ResourceFoundation\Dto\MaterializationRunResult;
 
 final class MaterializationRefreshJobTest extends TestCase {
 

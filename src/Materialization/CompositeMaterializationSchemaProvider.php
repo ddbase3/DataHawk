@@ -16,13 +16,13 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Materialization;
+namespace Base3\DataHawk\Materialization;
 
-use DataHawk\Schema\DataHawkQuerySchemaProviderRegistry;
-use ResourceFoundation\Api\IMaterializationSchemaProvider;
-use ResourceFoundation\Api\IScopedMaterializationManifestProvider;
-use ResourceFoundation\Dto\MaterializationManifest;
-use ResourceFoundation\Dto\TableMetadata;
+use Base3\DataHawk\Schema\DataHawkQuerySchemaProviderRegistry;
+use Base3\ResourceFoundation\Api\IMaterializationSchemaProvider;
+use Base3\ResourceFoundation\Api\IScopedMaterializationManifestProvider;
+use Base3\ResourceFoundation\Dto\MaterializationManifest;
+use Base3\ResourceFoundation\Dto\TableMetadata;
 
 final class CompositeMaterializationSchemaProvider implements IMaterializationSchemaProvider, IScopedMaterializationManifestProvider {
 

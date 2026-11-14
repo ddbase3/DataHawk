@@ -16,10 +16,10 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Compiler;
+namespace Base3\DataHawk\Compiler;
 
-use ResourceFoundation\Api\ITableNameResolver;
-use ResourceFoundation\Dto\TableNameResolutionContext;
+use Base3\ResourceFoundation\Api\ITableNameResolver;
+use Base3\ResourceFoundation\Dto\TableNameResolutionContext;
 
 class DefaultTableNameResolver implements ITableNameResolver {
 

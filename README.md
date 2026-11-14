@@ -39,7 +39,7 @@ The **DataHawk** plugin extends the BASE3 framework with a schema-driven query e
 
 ### Query execution
 
-* Execution via `IQueryService` (default: `DataHawk\Service\DefaultReportQueryService`)
+* Execution via `IQueryService` (default: `Base3\DataHawk\Service\DefaultReportQueryService`)
 * Uses BASE3 `IDatabase` for execution
 * Integrity validation for select results (unless wildcard mode is enabled)
 
@@ -62,7 +62,7 @@ DataHawk supports atomic multi-step operations using a **transaction query type*
 
 ## QueryResult
 
-`ResourceFoundation\Dto\QueryResult` provides:
+`Base3\ResourceFoundation\Dto\QueryResult` provides:
 
 * `columns`: column metadata (name/type/field/alias/table/sensitive)
 * `rows`: result rows
@@ -229,9 +229,9 @@ Notes:
 
 ## Export boundary
 
-DataHawk is the query layer. It compiles and executes structured queries and returns `ResourceFoundation\Dto\QueryResult`. It does not own report exporters.
+DataHawk is the query layer. It compiles and executes structured queries and returns `Base3\ResourceFoundation\Dto\QueryResult`. It does not own report exporters.
 
-Result transformation is defined by `ResourceFoundation\Api\IReportExporter` and implemented by output/reporting plugins such as Vizion. This keeps DataHawk usable as a standalone query service without a UI plugin. Consumers that need an export execute their query through `IQueryService` and pass the resulting `QueryResult` to a discoverable `IReportExporter`.
+Result transformation is defined by `Base3\ResourceFoundation\Api\IReportExporter` and implemented by output/reporting plugins such as Vizion. This keeps DataHawk usable as a standalone query service without a UI plugin. Consumers that need an export execute their query through `IQueryService` and pass the resulting `QueryResult` to a discoverable `IReportExporter`.
 
 ## Roadmap / ideas
 

@@ -16,13 +16,13 @@
  * https://github.com/ddbase3/DataHawk
  **********************************************************************/
 
-namespace DataHawk\Service;
+namespace Base3\DataHawk\Service;
 
-use Base3\Microservice\Api\IMicroserviceConnector;
-use Base3\Microservice\AbstractMicroservice;
-use ResourceFoundation\Api\IQueryService;
-use ResourceFoundation\Dto\QueryResult;
-use ResourceFoundation\Dto\TableMetadata;
+use Base3\CoreFoundation\Microservice\Api\IMicroserviceConnector;
+use Base3\CoreFoundation\Microservice\AbstractMicroservice;
+use Base3\ResourceFoundation\Api\IQueryService;
+use Base3\ResourceFoundation\Dto\QueryResult;
+use Base3\ResourceFoundation\Dto\TableMetadata;
 
 class DataHawkMicroservice extends AbstractMicroservice implements IQueryService {
 
